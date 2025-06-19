@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mario Kart GeoGuessr</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="menu">
+    <h1>Mario Kart GeoGuessr</h1>
+    <label for="seed">Seed:</label>
+    <input type="text" id="seed" placeholder="Leave blank for random">
+    <button id="start-btn">Start Game</button>
+  </div>
+
+  <div id="game" style="display: none;">
+    <h1>Mario Kart GeoGuessr</h1>
+    <p id="round-display">Round 1 / 5</p>
+
+    <div class="track-wrapper" id="track-wrapper">
+      <div class="track-container" id="track-container">
+        <img id="track-image" src="" alt="Track Image">
+      </div>
+    </div>
+
+<div class="map-wrapper" id="map-wrapper">
+  <!-- Add this SVG just before the map image -->
+  <svg id="guess-line" class="guess-line">
+    <line x1="0" y1="0" x2="0" y2="0" />
+  </svg>
+
+  <div class="map-container" id="map-container">
+    <img id="track-map" src="map/mk_map.webp" alt="Track Map">
+    <img id="marker-guess" class="marker" src="images/marker.png" alt="Guess">
+    <img id="marker-player" class="marker" src="images/marker.png" alt="Player">
+    <img id="marker-answer" class="marker" src="images/marker.png" alt="Answer">
+  </div>
+</div>
+
+    <button id="confirm-btn" style="display:none;">Confirm Guess</button>
+    <p id="result"></p>
+    <button id="next-btn" style="display:none;">Next Round</button>
+    <button id="restart-btn" style="display:none;">Restart Game</button>
+    <p id="score-display">Score: 0</p>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
