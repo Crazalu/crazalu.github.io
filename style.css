@@ -128,31 +128,17 @@ hr { border: 0; height: 1px; background-color: var(--leaderboard-border); margin
   color: var(--text-color);
 }
 
-/* ++ NEW: Media Query for Mobile Support ++ */
 @media (max-width: 800px) {
-  h1 {
-    font-size: 1.5em;
-  }
-  .menu-main, .game-main-area {
-    flex-direction: column;
-  }
-  .stats {
-    font-size: 1em;
-  }
-  .track-wrapper {
-    flex-basis: auto; /* Allow it to size based on content */
-    width: 100%;
-    margin-bottom: 10px; /* Reduce space between stacked items */
-  }
-  .map-wrapper {
-    flex-basis: auto;
-    width: 100%;
-  }
-  .btn-header {
-    position: relative; /* Make it part of the flow */
-    display: block;
-    margin: 0 auto 15px auto; /* Center it */
-    top: 0;
-    left: 0;
+  h1 { font-size: 1.5em; }
+  .menu-main, .game-main-area { flex-direction: column; }
+  .stats { font-size: 1em; }
+  .track-wrapper { flex-basis: auto; width: 100%; margin-bottom: 10px; }
+  .map-wrapper { flex-basis: auto; width: 100%; }
+  .btn-header { position: relative; display: block; margin: 0 auto 15px auto; top: 0; left: 0; }
+  
+  /* ++ NEW: Fix for mobile practice grid ++ */
+  #practice-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 10px;
   }
 }
