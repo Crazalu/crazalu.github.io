@@ -13,36 +13,18 @@
   --leaderboard-border: #ccc;
   --leaderboard-hover: #e9ecef;
 }
-
-/* ++ NEW: Theme classes that override the root variables ++ */
 .theme-dark {
-  --background-color: #333a45;
-  --text-color: #e1e1e1;
-  --border-color: #8899a6;
-  --modal-bg: #222730;
-  --leaderboard-bg: #222730;
-  --leaderboard-border: #555;
-  --leaderboard-hover: #3c4452;
+  --background-color: #333a45; --text-color: #e1e1e1; --border-color: #8899a6; --modal-bg: #222730;
+  --leaderboard-bg: #222730; --leaderboard-border: #555; --leaderboard-hover: #3c4452;
 }
 .theme-darker {
-  --background-color: #222730;
-  --text-color: #e1e1e1;
-  --border-color: #778996;
-  --modal-bg: #1a1e25;
-  --leaderboard-bg: #1a1e25;
-  --leaderboard-border: #444;
-  --leaderboard-hover: #3c4452;
+  --background-color: #222730; --text-color: #e1e1e1; --border-color: #778996; --modal-bg: #1a1e25;
+  --leaderboard-bg: #1a1e25; --leaderboard-border: #444; --leaderboard-hover: #3c4452;
 }
 .theme-black {
-  --background-color: #000000;
-  --text-color: #ffffff;
-  --border-color: #666666;
-  --modal-bg: #111;
-  --leaderboard-bg: #111;
-  --leaderboard-border: #333;
-  --leaderboard-hover: #222;
+  --background-color: #000000; --text-color: #ffffff; --border-color: #666666; --modal-bg: #111;
+  --leaderboard-bg: #111; --leaderboard-border: #333; --leaderboard-hover: #222;
 }
-
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; background-color: var(--background-color); color: var(--text-color); margin: 0; padding: 1em; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; transition: background-color 0.3s, color 0.3s; }
 h1 { margin-top: 0; margin-bottom: 20px; }
 h2 { margin-top: 0; }
@@ -71,7 +53,7 @@ button:hover { background-color: #0056b3; }
 .btn-secondary { background-color: var(--secondary-button-bg); }
 .btn-secondary:hover { background-color: #5a6268; }
 .btn-header { position: absolute; top: 0; left: 0; padding: 5px 10px; font-size: 0.9em; }
-input[type="text"] { padding: 8px; margin: 0 10px 10px 5px; border: 1px solid #ccc; border-radius: 5px; }
+input[type="text"], input[type="number"] { padding: 8px; margin: 0 10px 10px 5px; border: 1px solid #ccc; border-radius: 5px; }
 .menu-footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid var(--leaderboard-border); }
 #used-images-status { margin: 0 0 10px 0; color: #555; font-style: italic; }
 [hidden] { display: none !important; }
@@ -91,26 +73,19 @@ input[type="text"] { padding: 8px; margin: 0 10px 10px 5px; border: 1px solid #c
 .modal-seed-container p { margin: 0 0 0.5em 0; font-weight: bold; }
 .modal-seed-container span { font-family: monospace; font-size: 1.1em; margin-right: 10px; }
 .btn-copy-seed { padding: 4px 8px; font-size: 0.8em; }
+.seed-warning { font-style: italic; color: #e67e22; font-size: 0.9em; margin-top: 1em; margin-bottom: 0; }
+.theme-controls { margin: 20px 0; display: flex; align-items: center; justify-content: center; gap: 10px; }
+#theme-selector { padding: 8px; border-radius: 5px; border: 1px solid #ccc; }
+#custom-bg-color { border: none; background: none; width: 40px; height: 35px; cursor: pointer; padding: 0; border-radius: 5px; }
+.timer-controls { display: flex; align-items: center; justify-content: center; gap: 5px; margin: 20px 0; }
+.timer-controls input[type="number"] { width: 60px; text-align: center; }
+.timer-controls .checkbox-wrapper { margin-left: 10px; }
+.checkbox-wrapper { display: inline-flex; align-items: center; gap: 5px; }
+.stats .low-time { color: #e74c3c; font-weight: bold; }
 
-/* ++ NEW: Styles for the theme selector ++ */
-.theme-controls {
-  margin: 20px 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
-#theme-selector {
-  padding: 8px;
-  border-radius: 5px;
-  border: 1px solid #ccc;
-}
-#custom-bg-color {
-  border: none;
-  background: none;
-  width: 40px;
-  height: 35px;
-  cursor: pointer;
-  padding: 0;
-  border-radius: 5px;
-}
+/* ++ NEW: Styles for practice mode section ++ */
+hr { border: 0; height: 1px; background-color: var(--leaderboard-border); margin: 2em 0; }
+.practice-controls { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.practice-controls h2 { margin-bottom: 0; }
+.practice-controls select { padding: 8px; border-radius: 5px; border: 1px solid #ccc; max-width: 90%; }
+.practice-controls button { margin-top: 10px; }

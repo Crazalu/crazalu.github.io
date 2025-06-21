@@ -71,10 +71,32 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements = elements;
       this.trackPanZoom = new PanZoom(elements.trackWrapper, elements.trackContainer);
       this.mapPanZoom = new PanZoom(elements.mapWrapper, elements.mapContainer, { fit: true, maxZoom: 8, onUp: (e) => this.handleMapClick(e) });
+      
+      // ++ NEW: Populate practice selector and set initial state ++
+      this.populatePracticeSelector();
       this.bindEvents();
       this.updateStatusText();
       this.displayLeaderboard();
       this.isMirrorMode = false;
+      this.isPracticeMode = false;
+      this.currentImageLoadedSuccessfully = false;
+      this.seedWasModified = false;
+      this.isTimerEnabled = true;
+      this.timerDuration = 30;
+      this.roundTimer = null;
+      this.timeLeft = 0;
+    }
+    // ++ NEW: Method to populate the practice track dropdown ++
+    populatePracticeSelector() {
+      const enabledTracks = TRACKS_DATA.filter(t => t.enabled !== false);
+      enabledTracks.forEach(track => {
+        const option = document.createElement('option');
+        option.value = track.image;
+        // Create a user-friendly name from the image path
+        const trackName = track.image.split('/').pop().replace('.webp', '').replace(/_/g, ' ');
+        option.textContent = trackName.charAt(0).toUpperCase() + trackName.slice(1);
+        this.elements.practiceTrackSelector.appendChild(option);
+      });
     }
     transformX(x) {
         if (this.isMirrorMode) {
@@ -104,9 +126,45 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.modalPlayAgainBtn.addEventListener('click', () => { this.elements.endGameModal.hidden = true; this.start(); });
       this.elements.modalBackToMenuBtn.addEventListener('click', () => { this.elements.endGameModal.hidden = true; this.hideGameAndShowMenu(); });
       this.elements.saveScoreBtn.addEventListener('click', () => this.saveHighScore());
+      // ++ NEW: Bind the practice button ++
+      this.elements.startPracticeBtn.addEventListener('click', () => this.startPracticeRound());
+    }
+    // ++ NEW: Method to start a single practice round ++
+    startPracticeRound() {
+      const selectedTrackImage = this.elements.practiceTrackSelector.value;
+      if (!selectedTrackImage) {
+        alert("Please select a track to practice.");
+        return;
+      }
+
+      const foundTrack = TRACKS_DATA.find(t => t.image === selectedTrackImage);
+      if (!foundTrack) {
+        alert("Could not find the selected track data.");
+        return;
+      }
+      
+      this.isPracticeMode = true;
+      this.isMirrorMode = this.elements.mirrorModeCheckbox.checked;
+      this.isTimerEnabled = !this.elements.unlimitedTimeCheckbox.checked;
+      this.timerDuration = parseInt(this.elements.roundTimerInput.value, 10) || 30;
+
+      this.shuffledTracks = [foundTrack]; // Game will only have this one track
+      this.score = 0;
+      this.round = 0;
+
+      this.elements.scoreDisplay.textContent = "Score: 0";
+      this.elements.menu.hidden = true;
+      this.elements.gameUI.hidden = false;
+      this.elements.mapImage.style.transform = this.isMirrorMode ? 'scaleX(-1)' : 'none';
+      this.loadRound();
     }
     start() {
+      this.isPracticeMode = false; // Ensure this is false for a normal game
+      this.isTimerEnabled = !this.elements.unlimitedTimeCheckbox.checked;
+      const duration = parseInt(this.elements.roundTimerInput.value, 10);
+      this.timerDuration = !isNaN(duration) && duration >= 5 ? duration : 30;
       this.isMirrorMode = this.elements.mirrorModeCheckbox.checked;
+      this.seedWasModified = false;
       const hardcodedSeed = undefined;
       const seedVal = (typeof hardcodedSeed !== 'undefined') ? hardcodedSeed : this.elements.seedInput.value.trim();
       this.gameSeed = seedVal !== '' ? seedVal : Math.floor(Math.random() * 100000);
@@ -125,16 +183,133 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.mapImage.style.transform = this.isMirrorMode ? 'scaleX(-1)' : 'none';
       this.loadRound();
     }
-    loadRound() {
-      this.canGuess = true; this.currentTrack = this.shuffledTracks[this.round];
-      this.elements.trackImage.src = this.currentTrack.image; this.pendingGuess = null;
+    
+    finalizeRoundSetup() {
+      this.pendingGuess = null;
       this.elements.trackImage.style.transform = this.isMirrorMode ? 'scaleX(-1)' : 'none';
-      this.trackPanZoom.reset(); this.mapPanZoom.reset();
-      this.elements.markerGuess.hidden = true; this.elements.markerPlayer.hidden = true; this.elements.markerAnswer.hidden = true;
-      this.elements.guessLine.style.display = 'none'; this.elements.confirmBtn.hidden = true; this.elements.nextBtn.hidden = true;
-      this.elements.resultText.textContent = ""; this.elements.roundDisplay.textContent = `Round ${this.round + 1} / ${this.shuffledTracks.length}`;
+      this.trackPanZoom.reset();
+      this.mapPanZoom.reset();
+      this.elements.markerGuess.hidden = true;
+      this.elements.markerPlayer.hidden = true;
+      this.elements.markerAnswer.hidden = true;
+      this.elements.guessLine.style.display = 'none';
+      this.elements.confirmBtn.hidden = true;
+      this.elements.nextBtn.hidden = true;
+      this.elements.resultText.textContent = "";
+      
+      // ++ MODIFIED: Display round count correctly for practice vs normal mode ++
+      const totalRounds = this.isPracticeMode ? 1 : this.shuffledTracks.length;
+      this.elements.roundDisplay.textContent = `Round ${this.round + 1} / ${totalRounds}`;
+      
+      this.startRoundTimer();
     }
-    nextRound() { this.round++; this.loadRound(); }
+    
+    loadRound() {
+      this.canGuess = true;
+      this.currentImageLoadedSuccessfully = false;
+      this.currentTrack = this.shuffledTracks[this.round];
+      this.elements.trackImage.onload = () => {
+        this.currentImageLoadedSuccessfully = true;
+        this.finalizeRoundSetup();
+      };
+      this.elements.trackImage.onerror = () => {
+        this.handleImageError(0);
+      };
+      this.elements.trackImage.src = this.currentTrack.image;
+    }
+
+    startRoundTimer() {
+      clearInterval(this.roundTimer);
+      this.elements.timerDisplay.classList.remove('low-time');
+      if (!this.isTimerEnabled) {
+        this.elements.timerDisplay.textContent = "Time: ∞";
+        return;
+      }
+      this.timeLeft = this.timerDuration;
+      this.elements.timerDisplay.textContent = `Time: ${this.timeLeft}`;
+      this.roundTimer = setInterval(() => {
+        this.timeLeft--;
+        this.elements.timerDisplay.textContent = `Time: ${this.timeLeft}`;
+        if (this.timeLeft <= 5) {
+          this.elements.timerDisplay.classList.add('low-time');
+        }
+        if (this.timeLeft <= 0) {
+          this.handleTimeout();
+        }
+      }, 1000);
+    }
+
+    handleTimeout() {
+        clearInterval(this.roundTimer);
+        this.canGuess = false;
+        alert("Time's up!");
+        this.score += 0;
+        this.elements.scoreDisplay.textContent = `Score: ${this.score}`;
+        this.elements.resultText.textContent = "Time's up! +0 pts";
+        const answerX = this.transformX(this.currentTrack.mapX);
+        const answerY = this.currentTrack.mapY;
+        this.elements.markerAnswer.style.left = `${answerX}px`;
+        this.elements.markerAnswer.style.top = `${answerY}px`;
+        this.elements.markerAnswer.hidden = false;
+        this.elements.markerGuess.hidden = true;
+        this.elements.confirmBtn.hidden = true;
+
+        // ++ MODIFIED: Practice mode ends differently ++
+        if (this.isPracticeMode) {
+          this.elements.nextBtn.textContent = 'Back to Menu';
+          this.elements.nextBtn.hidden = false;
+        } else if (this.round < this.shuffledTracks.length - 1) {
+            this.elements.nextBtn.hidden = false;
+        } else {
+            this.showFinalResults();
+        }
+    }
+
+    handleImageError(rerollAttempts) {
+      const MAX_REROLLS = 10;
+      if (rerollAttempts >= MAX_REROLLS) {
+        alert("Could not find a working track image after multiple attempts. Skipping this round.");
+        if (this.round < this.shuffledTracks.length - 1) {
+          this.nextRound();
+        } else {
+          this.showFinalResults();
+        }
+        return;
+      }
+      if (!this.seedWasModified && !this.isPracticeMode) {
+        this.seedWasModified = true;
+        alert("A track image could not be found. Rerolling to a new one for this round.");
+      }
+      const currentRoundImagePaths = this.shuffledTracks.map(t => t.image);
+      const replacementTracks = TRACKS_DATA.filter(track =>
+        track.enabled !== false && !currentRoundImagePaths.includes(track.image)
+      );
+      if (replacementTracks.length > 0) {
+        const newTrack = replacementTracks[Math.floor(Math.random() * replacementTracks.length)];
+        this.shuffledTracks[this.round] = newTrack;
+        this.currentTrack = newTrack;
+        this.elements.trackImage.onerror = () => this.handleImageError(rerollAttempts + 1);
+        this.elements.trackImage.src = newTrack.image;
+      } else {
+        alert("A track image could not be found and no replacements are available. Skipping this round.");
+        if (this.round < this.shuffledTracks.length - 1) {
+          this.nextRound();
+        } else {
+          this.showFinalResults();
+        }
+      }
+    }
+
+    nextRound() {
+      // ++ MODIFIED: If in practice mode, this button takes you back to the menu ++
+      if (this.isPracticeMode) {
+        this.hideGameAndShowMenu();
+        return;
+      }
+      this.round++;
+      this.loadRound();
+    }
+    
     handleMapClick(e) {
       if (!this.canGuess) return;
       const rect = this.elements.mapWrapper.getBoundingClientRect();
@@ -144,8 +319,14 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.markerGuess.style.left = `${guessX}px`; this.elements.markerGuess.style.top = `${guessY}px`;
       this.elements.markerGuess.hidden = false; this.elements.confirmBtn.hidden = false;
     }
+
     confirmGuess() {
-      if (!this.pendingGuess) return;
+      if (!this.pendingGuess || !this.canGuess) return;
+      clearInterval(this.roundTimer);
+      if (!this.currentImageLoadedSuccessfully) {
+        alert("Please wait for the image to load or for a replacement to be found.");
+        return;
+      }
       this.canGuess = false;
       const answerX = this.transformX(this.currentTrack.mapX);
       const answerY = this.currentTrack.mapY;
@@ -153,40 +334,77 @@ document.addEventListener("DOMContentLoaded", () => {
       const dy = this.pendingGuess.y - answerY;
       const distance = Math.hypot(dx, dy); let points = 0;
       if (distance <= 15) points = 200; else if (distance <= 200) points = Math.round(200 - distance);
-      this.score += points; this.elements.scoreDisplay.textContent = `Score: ${this.score}`;
+      this.score += points;
+      this.elements.scoreDisplay.textContent = `Score: ${this.score}`;
       this.elements.resultText.textContent = `Distance: ${Math.round(distance)}px | +${points} pts`;
-      if (this.elements.seedInput.value.trim() === '') { setUsedImages([...new Set([...getUsedImages(), this.currentTrack.image])]); }
-      this.elements.markerPlayer.style.left = `${this.pendingGuess.x}px`; this.elements.markerPlayer.style.top = `${this.pendingGuess.y}px`;
+      
+      if (this.currentImageLoadedSuccessfully && this.elements.seedInput.value.trim() === '' && !this.isPracticeMode) {
+        setUsedImages([...new Set([...getUsedImages(), this.currentTrack.image])]);
+      }
+      
+      this.elements.markerPlayer.style.left = `${this.pendingGuess.x}px`;
+      this.elements.markerPlayer.style.top = `${this.pendingGuess.y}px`;
       this.elements.markerAnswer.style.left = `${answerX}px`;
       this.elements.markerAnswer.style.top = `${answerY}px`;
-      this.elements.markerPlayer.hidden = false; this.elements.markerAnswer.hidden = false;
+      this.elements.markerPlayer.hidden = false;
+      this.elements.markerAnswer.hidden = false;
       this.elements.guessLine.setAttribute("x1", answerX);
       this.elements.guessLine.setAttribute("y1", answerY);
       this.elements.guessLine.setAttribute("x2", this.pendingGuess.x);
       this.elements.guessLine.setAttribute("y2", this.pendingGuess.y);
       this.elements.guessLine.style.display = "block";
-      this.elements.markerGuess.hidden = true; this.elements.confirmBtn.hidden = true;
-      if (this.round < this.shuffledTracks.length - 1) { this.elements.nextBtn.hidden = false; } else { this.showFinalResults(); }
+      this.elements.markerGuess.hidden = true;
+      this.elements.confirmBtn.hidden = true;
+
+      // ++ MODIFIED: Handle end-of-game logic for practice vs normal mode ++
+      const isLastRound = this.round >= this.shuffledTracks.length - 1;
+      if (isLastRound) {
+        if (this.isPracticeMode) {
+          this.elements.nextBtn.textContent = 'Back to Menu';
+          this.elements.nextBtn.hidden = false;
+        } else {
+          this.showFinalResults();
+        }
+      } else {
+        this.elements.nextBtn.hidden = false;
+      }
     }
     hideGameAndShowMenu() {
-      this.elements.gameUI.hidden = true; this.elements.menu.hidden = false;
+      clearInterval(this.roundTimer);
+      this.elements.gameUI.hidden = true;
+      this.elements.menu.hidden = false;
       this.elements.mapImage.style.transform = 'none';
+      // ++ NEW: Reset the Next button's text when returning to menu ++
+      this.elements.nextBtn.textContent = 'Next Round';
       this.displayLeaderboard();
     }
     showFinalResults() {
       const maxScore = 200 * this.shuffledTracks.length;
       this.elements.modalFinalScore.textContent = `${this.score} / ${maxScore}`;
       if (this.isHighScore(this.score)) {
-        this.elements.saveScoreForm.hidden = false; this.elements.playerNameInput.value = '';
-        this.elements.saveScoreBtn.disabled = false; this.elements.saveScoreBtn.textContent = "Save Score";
-      } else { this.elements.saveScoreForm.hidden = true; }
+        this.elements.saveScoreForm.hidden = false;
+        this.elements.playerNameInput.value = '';
+        this.elements.saveScoreBtn.disabled = false;
+        this.elements.saveScoreBtn.textContent = "Save Score";
+      } else {
+        this.elements.saveScoreForm.hidden = true;
+      }
+      
       const seedContainer = this.elements.modalSeedContainer;
       seedContainer.innerHTML = `<p>Game Seed:</p><div><span>${this.gameSeed}</span><button class="btn-secondary btn-copy-seed">Copy</button></div>`;
       seedContainer.querySelector('button').addEventListener('click', () => this.shareSeed(this.gameSeed));
+      
+      if (this.seedWasModified) {
+        const warning = document.createElement('p');
+        warning.className = 'seed-warning';
+        warning.textContent = 'Note: An image failed to load and was rerolled. This seed will not produce the same game for others.';
+        seedContainer.appendChild(warning);
+      }
+
       this.elements.endGameModal.hidden = false;
     }
     isHighScore(score) {
-      if (score === 0) return false;
+      if (score === 0 || this.isPracticeMode) return false; // Don't save high scores for practice
       const scores = getLeaderboard();
       const lowestScore = scores.length > 0 ? scores[scores.length - 1].score : 0;
       return score > lowestScore || scores.length < LEADERBOARD_MAX_ENTRIES;
@@ -197,7 +415,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const newEntry = { name, score: this.score, seed: this.gameSeed, dataHash: generateDataHash(TRACKS_DATA) };
       const newScores = [...scores, newEntry].sort((a, b) => b.score - a.score).slice(0, LEADERBOARD_MAX_ENTRIES);
       setLeaderboard(newScores);
-      this.elements.saveScoreBtn.disabled = true; this.elements.saveScoreBtn.textContent = "Saved!";
+      this.elements.saveScoreBtn.disabled = true;
+      this.elements.saveScoreBtn.textContent = "Saved!";
     }
     shareSeed(seed, savedHash) {
       navigator.clipboard.writeText(seed).then(() => {
@@ -207,6 +426,9 @@ document.addEventListener("DOMContentLoaded", () => {
           message += "\n\nWarning: The game's track data has changed since this score was set. Playing this seed may result in a different set of rounds.";
         } else if (!savedHash) {
           message += "\n\nNote: If the game's track data is updated in the future, this seed may produce different rounds.";
+        }
+        if (this.seedWasModified) {
+          message += "\n\nAdditionally, an image failed to load during your game and was replaced, so this seed is unique to your playthrough.";
         }
         alert(message);
       }).catch(err => { console.error('Could not copy text: ', err); alert('Failed to copy seed.'); });
@@ -230,28 +452,32 @@ document.addEventListener("DOMContentLoaded", () => {
     saveScoreBtn: document.getElementById("save-score-btn"), modalPlayAgainBtn: document.getElementById("modal-play-again-btn"),
     modalBackToMenuBtn: document.getElementById("modal-back-to-menu-btn"),
     modalSeedContainer: document.getElementById("modal-seed-container"),
-    // ++ NEW: Elements for theme manager ++
     themeSelector: document.getElementById('theme-selector'),
     customBgColorInput: document.getElementById('custom-bg-color'),
+    roundTimerInput: document.getElementById('round-timer-input'),
+    unlimitedTimeCheckbox: document.getElementById('unlimited-time-checkbox'),
+    timerDisplay: document.getElementById('timer-display'),
+    // ++ NEW: Practice mode elements ++
+    practiceTrackSelector: document.getElementById('practice-track-selector'),
+    startPracticeBtn: document.getElementById('start-practice-btn'),
   };
   
   new Game(elements);
 
-  // ++ NEW: THEME MANAGER LOGIC ++
+  elements.unlimitedTimeCheckbox.addEventListener('change', (e) => {
+    elements.roundTimerInput.disabled = e.target.checked;
+  });
+
   const THEME_KEY = 'marioKartGeoGuessr_theme';
   const CUSTOM_COLOR_KEY = 'marioKartGeoGuessr_customColor';
   
   function applyTheme(theme, customColor) {
-    // Reset all theme classes
     document.body.classList.remove('theme-dark', 'theme-darker', 'theme-black');
-    // Reset inline styles
     document.body.style.setProperty('--background-color', '');
     document.body.style.setProperty('--text-color', '');
-  
     if (theme === 'custom') {
       elements.customBgColorInput.hidden = false;
       document.body.style.setProperty('--background-color', customColor);
-      // Basic contrast check for text color
       const hex = customColor.replace('#', '');
       const r = parseInt(hex.substring(0, 2), 16);
       const g = parseInt(hex.substring(2, 4), 16);
@@ -266,33 +492,25 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
   }
-
   function loadTheme() {
     const savedTheme = localStorage.getItem(THEME_KEY) || 'light';
     const savedCustomColor = localStorage.getItem(CUSTOM_COLOR_KEY) || '#f0f0f0';
-    
     elements.themeSelector.value = savedTheme;
     elements.customBgColorInput.value = savedCustomColor;
-
     applyTheme(savedTheme, savedCustomColor);
   }
-
   elements.themeSelector.addEventListener('change', () => {
     const selectedTheme = elements.themeSelector.value;
     const customColor = elements.customBgColorInput.value;
     localStorage.setItem(THEME_KEY, selectedTheme);
     applyTheme(selectedTheme, customColor);
   });
-
   elements.customBgColorInput.addEventListener('input', () => {
     const customColor = elements.customBgColorInput.value;
     localStorage.setItem(CUSTOM_COLOR_KEY, customColor);
-    // Ensure we're in custom theme mode
     if (elements.themeSelector.value === 'custom') {
       applyTheme('custom', customColor);
     }
   });
-
-  // Load the saved theme on initial page load
   loadTheme();
 });
