@@ -4,6 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const LEADERBOARD_KEY = 'marioKartGeoGuessr_leaderboard';
   const LEADERBOARD_MAX_ENTRIES = 5;
   const MAP_WIDTH = 2004;
+  const MIN_DISTANCE = 20;
 
   const getUsedImages = () => JSON.parse(localStorage.getItem(USED_IMAGES_KEY)) || [];
   const setUsedImages = (list) => localStorage.setItem(USED_IMAGES_KEY, JSON.stringify(list));
@@ -14,7 +15,31 @@ document.addEventListener("DOMContentLoaded", () => {
   function mulberry32(seed) { let a=typeof seed==='string'?Array.from(seed).reduce((a,c)=>a+c.charCodeAt(0),0):seed; return function(){a|=0;a=a+1831565813|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
   function seededShuffle(array, seed) { const r=mulberry32(seed);const c=[...array];for(let i=c.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[c[i],c[j]]=[c[j],c[i]]}return c }
 
-  // ++ MODIFIED: Complete refactor of PanZoom for robust touch and pinch support ++
+  function selectSpacedTracks(shuffledList, count, minDistance) {
+    if (shuffledList.length < count) {
+        return shuffledList;
+    }
+    const result = [];
+    const pool = [...shuffledList];
+    if (pool.length > 0) {
+        result.push(pool.shift());
+    }
+    while (result.length < count && pool.length > 0) {
+        const lastTrack = result[result.length - 1];
+        const foundIndex = pool.findIndex(track => 
+            Math.hypot(track.mapX - lastTrack.mapX, track.mapY - lastTrack.mapY) > minDistance
+        );
+        if (foundIndex !== -1) {
+            const [nextTrack] = pool.splice(foundIndex, 1);
+            result.push(nextTrack);
+        } else {
+            console.warn("Could not find enough spaced-out tracks. The game will have fewer rounds.");
+            break;
+        }
+    }
+    return result;
+  }
+
   class PanZoom {
     constructor(wrapper, container, options = {}) {
       this.wrapper = wrapper; this.container = container; this.options = options;
@@ -24,7 +49,22 @@ document.addEventListener("DOMContentLoaded", () => {
       this.bindEvents();
       this.wrapper.style.cursor = 'grab';
     }
+    
+    // ++ MODIFIED: This is the definitive fix for the layout race condition ++
     reset() {
+      // If the wrapper isn't rendered yet, its width will be 0.
+      // In that case, we retry on the next animation frame.
+      if (this.wrapper.clientWidth === 0) {
+          this.options.retryCount = (this.options.retryCount || 0) + 1;
+          if (this.options.retryCount < 20) { // Safety break
+              requestAnimationFrame(() => this.reset());
+          } else {
+              console.error("PanZoom reset failed: Wrapper has no dimensions.");
+          }
+          return;
+      }
+      delete this.options.retryCount; // Reset counter on success
+
       this.initialScale = 1; this.initialOffset = { x: 0, y: 0 };
       if (this.options.fit) {
         const wW = this.wrapper.clientWidth; const wH = this.wrapper.clientHeight;
@@ -33,7 +73,8 @@ document.addEventListener("DOMContentLoaded", () => {
           this.initialScale = Math.min(wW / cW, wH / cH);
           const oXP = (wW - (cW * this.initialScale)) / 2;
           const oYP = (wH - (cH * this.initialScale)) / 2;
-          this.initialOffset.x = oXP / this.initialScale; this.initialOffset.y = oYP / this.initialScale;
+          this.initialOffset.x = oXP / this.initialScale;
+          this.initialOffset.y = oYP / this.initialScale;
         }
       }
       this.scale = this.initialScale; this.offset = { ...this.initialOffset };
@@ -73,7 +114,6 @@ document.addEventListener("DOMContentLoaded", () => {
       if (e.touches) e.preventDefault();
       
       if (e.touches && e.touches.length === 2 && this.prevPinchDist) {
-        // Pinch-to-zoom logic
         const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
         const scaleChange = dist / this.prevPinchDist;
         const oldScale = this.scale;
@@ -88,7 +128,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         this.prevPinchDist = dist;
       } else {
-        // Pan logic
         const point = e.touches ? e.touches[0] : e;
         this.didPan = true;
         this.offset.x += (point.clientX - this.prevPos.x) / this.scale;
@@ -111,18 +150,24 @@ document.addEventListener("DOMContentLoaded", () => {
       e.preventDefault();
       const oldScale = this.scale;
       const scaleDelta = e.deltaY > 0 ? -0.1 : 0.1;
-      this.scale = Math.max(this.minScale, Math.min(this.maxScale, this.scale + scaleDelta * this.initialScale));
-      if (oldScale === this.scale) return;
+      const newScale = Math.max(this.minScale, Math.min(this.maxScale, this.scale + scaleDelta * this.initialScale));
+      if (oldScale === newScale) return;
+
       const rect = this.wrapper.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
-      this.offset.x += (mouseX / this.scale) - (mouseX / oldScale);
-      this.offset.y += (mouseY / this.scale) - (mouseY / oldScale);
+
+      const pointX = (mouseX / oldScale) - this.offset.x;
+      const pointY = (mouseY / oldScale) - this.offset.y;
+      
+      this.offset.x = (mouseX / newScale) - pointX;
+      this.offset.y = (mouseY / newScale) - pointY;
+      
+      this.scale = newScale;
       this.updateTransform();
     }
   }
 
-  // The rest of the Game class and other functions remain the same
   class Game {
     constructor(elements) {
       this.elements = elements;
@@ -140,39 +185,39 @@ document.addEventListener("DOMContentLoaded", () => {
       this.timerDuration = 30;
       this.roundTimer = null;
       this.timeLeft = 0;
+      this.isFadeTimerEnabled = false;
+      this.fadeTimerDuration = 10;
+      this.imageFadeTimer = null;
     }
     
     populatePracticeGrid() {
       const grid = this.elements.practiceGrid;
       grid.innerHTML = '';
       const enabledTracks = TRACKS_DATA.filter(t => t.enabled !== false);
+      const usedImages = getUsedImages();
 
       enabledTracks.forEach(track => {
         const card = document.createElement('div');
         card.className = 'practice-card';
-        
         const img = document.createElement('img');
         img.src = track.image;
         img.alt = "Image preview";
         img.loading = 'lazy';
-
         const p = document.createElement('p');
-        const trackName = track.image.split('/').pop().replace('.webp', '').replace(/_/g, ' ');
-        p.textContent = trackName.charAt(0).toUpperCase() + trackName.slice(1);
-
+        p.textContent = track.name || 'Unnamed';
         card.appendChild(img);
         card.appendChild(p);
-        
-        card.addEventListener('click', () => this.startPracticeRound(track));
-        
+        if (usedImages.includes(track.image)) {
+            card.addEventListener('click', () => this.startPracticeRound(track));
+        } else {
+            card.classList.add('locked');
+        }
         grid.appendChild(card);
       });
     }
 
     transformX(x) {
-        if (this.isMirrorMode) {
-            return (MAP_WIDTH - 1) - x;
-        }
+        if (this.isMirrorMode) { return (MAP_WIDTH - 1) - x; }
         return x;
     }
     updateStatusText() { const totalEnabled = TRACKS_DATA.filter(t => t.enabled !== false).length; const usedCount = getUsedImages().length; this.elements.statusText.textContent = `You have seen ${usedCount} of ${totalEnabled} images.`; }
@@ -192,7 +237,15 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.startBtn.addEventListener('click', () => this.start());
       this.elements.nextBtn.addEventListener('click', () => this.nextRound());
       this.elements.confirmBtn.addEventListener('click', () => this.confirmGuess());
-      this.elements.resetUsedBtn.addEventListener('click', () => { if (confirm("Are you sure? This will reset your seen images history.")) { clearUsedImages(); this.updateStatusText(); alert("Seen images have been reset!"); } });
+      this.elements.endGameBtn.addEventListener('click', () => this.showFinalResults());
+      this.elements.resetUsedBtn.addEventListener('click', () => { 
+        if (confirm("Are you sure? This will reset your seen images history.")) { 
+          clearUsedImages(); 
+          this.updateStatusText(); 
+          this.populatePracticeGrid();
+          alert("Seen images have been reset!"); 
+        } 
+      });
       this.elements.backToMenuBtn.addEventListener('click', () => { if (confirm("Are you sure you want to quit? Your score will not be saved.")) { this.hideGameAndShowMenu(); } });
       this.elements.modalPlayAgainBtn.addEventListener('click', () => { this.elements.endGameModal.hidden = true; this.start(); });
       this.elements.modalBackToMenuBtn.addEventListener('click', () => { this.elements.endGameModal.hidden = true; this.hideGameAndShowMenu(); });
@@ -201,26 +254,21 @@ document.addEventListener("DOMContentLoaded", () => {
     
     startPracticeRound(track) {
       if (!track) return;
-      
+      this.setupGameSettings();
       this.isPracticeMode = true;
-      this.isMirrorMode = this.elements.mirrorModeCheckbox.checked;
-      this.isTimerEnabled = !this.elements.unlimitedTimeCheckbox.checked;
-      this.timerDuration = parseInt(this.elements.roundTimerInput.value, 10) || 30;
       this.shuffledTracks = [track];
       this.score = 0;
       this.round = 0;
       this.elements.scoreDisplay.textContent = "Score: 0";
       this.elements.menu.hidden = true;
+      this.elements.menuBackground.hidden = true;
       this.elements.gameUI.hidden = false;
       this.elements.mapImage.style.transform = this.isMirrorMode ? 'scaleX(-1)' : 'none';
       this.loadRound();
     }
     start() {
+      this.setupGameSettings();
       this.isPracticeMode = false;
-      this.isTimerEnabled = !this.elements.unlimitedTimeCheckbox.checked;
-      const duration = parseInt(this.elements.roundTimerInput.value, 10);
-      this.timerDuration = !isNaN(duration) && duration >= 5 ? duration : 30;
-      this.isMirrorMode = this.elements.mirrorModeCheckbox.checked;
       this.seedWasModified = false;
       const hardcodedSeed = undefined;
       const seedVal = (typeof hardcodedSeed !== 'undefined') ? hardcodedSeed : this.elements.seedInput.value.trim();
@@ -233,13 +281,31 @@ document.addEventListener("DOMContentLoaded", () => {
         clearUsedImages(); this.updateStatusText(); availableTracks = enabledTracks;
       }
       if (availableTracks.length === 0) { alert("Error: No images are available to play."); return; }
-      this.shuffledTracks = seededShuffle(availableTracks, this.gameSeed).slice(0, MAX_ROUNDS);
+      
+      const fullyShuffled = seededShuffle(availableTracks, this.gameSeed);
+      this.shuffledTracks = selectSpacedTracks(fullyShuffled, MAX_ROUNDS, MIN_DISTANCE);
+
+      if (this.shuffledTracks.length < MAX_ROUNDS) {
+          alert(`Warning: Could only find ${this.shuffledTracks.length} rounds that meet the minimum distance requirement. Your game will be shorter.`);
+      }
+
       this.score = 0; this.round = 0;
       this.elements.scoreDisplay.textContent = "Score: 0";
       this.elements.menu.hidden = true;
+      this.elements.menuBackground.hidden = true;
       this.elements.gameUI.hidden = false;
       this.elements.mapImage.style.transform = this.isMirrorMode ? 'scaleX(-1)' : 'none';
       this.loadRound();
+    }
+    
+    setupGameSettings() {
+        this.isMirrorMode = this.elements.mirrorModeCheckbox.checked;
+        this.isTimerEnabled = !this.elements.unlimitedTimeCheckbox.checked;
+        const roundDuration = parseInt(this.elements.roundTimerInput.value, 10);
+        this.timerDuration = !isNaN(roundDuration) && roundDuration >= 5 ? roundDuration : 30;
+        this.isFadeTimerEnabled = this.elements.fadeTimerCheckbox.checked;
+        const fadeDuration = parseInt(this.elements.fadeTimerInput.value, 10);
+        this.fadeTimerDuration = !isNaN(fadeDuration) && fadeDuration >= 1 ? fadeDuration : 10;
     }
     
     finalizeRoundSetup() {
@@ -253,15 +319,19 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.guessLine.style.display = 'none';
       this.elements.confirmBtn.hidden = true;
       this.elements.nextBtn.hidden = true;
+      this.elements.endGameBtn.hidden = true;
       this.elements.resultText.textContent = "";
-      const totalRounds = this.isPracticeMode ? 1 : this.shuffledTracks.length;
+      const totalRounds = this.shuffledTracks.length;
       this.elements.roundDisplay.textContent = `Round ${this.round + 1} / ${totalRounds}`;
       const credit = this.currentTrack.credit || "Crazalu";
       this.elements.trackCredit.textContent = `Credit: ${credit}`;
       this.startRoundTimer();
+      this.startImageFadeTimer();
     }
     
     loadRound() {
+      clearTimeout(this.imageFadeTimer);
+      this.elements.trackWrapper.classList.remove('faded-out');
       this.canGuess = true;
       this.currentImageLoadedSuccessfully = false;
       this.currentTrack = this.shuffledTracks[this.round];
@@ -269,9 +339,7 @@ document.addEventListener("DOMContentLoaded", () => {
         this.currentImageLoadedSuccessfully = true;
         this.finalizeRoundSetup();
       };
-      this.elements.trackImage.onerror = () => {
-        this.handleImageError(0);
-      };
+      this.elements.trackImage.onerror = () => { this.handleImageError(0); };
       this.elements.trackImage.src = this.currentTrack.image;
     }
 
@@ -288,17 +356,22 @@ document.addEventListener("DOMContentLoaded", () => {
       this.roundTimer = setInterval(() => {
         this.timeLeft--;
         this.elements.timerDisplay.textContent = `Time: ${this.timeLeft}`;
-        if (this.timeLeft <= 5) {
-          this.elements.timerDisplay.classList.add('low-time');
-        }
-        if (this.timeLeft <= 0) {
-          this.handleTimeout();
-        }
+        if (this.timeLeft <= 5) { this.elements.timerDisplay.classList.add('low-time'); }
+        if (this.timeLeft <= 0) { this.handleTimeout(); }
       }, 1000);
+    }
+    
+    startImageFadeTimer() {
+        clearTimeout(this.imageFadeTimer);
+        if (!this.isFadeTimerEnabled) return;
+        
+        this.imageFadeTimer = setTimeout(() => {
+            this.elements.trackWrapper.classList.add('faded-out');
+        }, this.fadeTimerDuration * 1000);
     }
 
     handleTimeout() {
-        clearInterval(this.roundTimer);
+        this.stopAllTimers();
         this.canGuess = false;
         alert("Time's up!");
         this.score += 0;
@@ -311,13 +384,16 @@ document.addEventListener("DOMContentLoaded", () => {
         this.elements.markerAnswer.hidden = false;
         this.elements.markerGuess.hidden = true;
         this.elements.confirmBtn.hidden = true;
-        if (this.isPracticeMode) {
-          this.elements.nextBtn.textContent = 'Back to Menu';
-          this.elements.nextBtn.hidden = false;
-        } else if (this.round < this.shuffledTracks.length - 1) {
-            this.elements.nextBtn.hidden = false;
+        const isLastRound = this.round >= this.shuffledTracks.length - 1;
+        if (isLastRound) {
+            if (this.isPracticeMode) {
+                this.elements.nextBtn.textContent = 'Back to Menu';
+                this.elements.nextBtn.hidden = false;
+            } else {
+                this.elements.endGameBtn.hidden = false;
+            }
         } else {
-            this.showFinalResults();
+            this.elements.nextBtn.hidden = false;
         }
     }
 
@@ -325,11 +401,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const MAX_REROLLS = 10;
       if (rerollAttempts >= MAX_REROLLS) {
         alert("Could not find a working image after multiple attempts. Skipping this round.");
-        if (this.round < this.shuffledTracks.length - 1) {
-          this.nextRound();
-        } else {
-          this.showFinalResults();
-        }
+        if (this.round < this.shuffledTracks.length - 1) { this.nextRound(); } else { this.showFinalResults(); }
         return;
       }
       if (!this.seedWasModified && !this.isPracticeMode) {
@@ -337,9 +409,7 @@ document.addEventListener("DOMContentLoaded", () => {
         alert("An image could not be found. Rerolling to a new one for this round.");
       }
       const currentRoundImagePaths = this.shuffledTracks.map(t => t.image);
-      const replacementTracks = TRACKS_DATA.filter(track =>
-        track.enabled !== false && !currentRoundImagePaths.includes(track.image)
-      );
+      const replacementTracks = TRACKS_DATA.filter(track => track.enabled !== false && !currentRoundImagePaths.includes(track.image));
       if (replacementTracks.length > 0) {
         const newTrack = replacementTracks[Math.floor(Math.random() * replacementTracks.length)];
         this.shuffledTracks[this.round] = newTrack;
@@ -348,19 +418,12 @@ document.addEventListener("DOMContentLoaded", () => {
         this.elements.trackImage.src = newTrack.image;
       } else {
         alert("An image could not be found and no replacements are available. Skipping this round.");
-        if (this.round < this.shuffledTracks.length - 1) {
-          this.nextRound();
-        } else {
-          this.showFinalResults();
-        }
+        if (this.round < this.shuffledTracks.length - 1) { this.nextRound(); } else { this.showFinalResults(); }
       }
     }
 
     nextRound() {
-      if (this.isPracticeMode) {
-        this.hideGameAndShowMenu();
-        return;
-      }
+      if (this.isPracticeMode) { this.hideGameAndShowMenu(); return; }
       this.round++;
       this.loadRound();
     }
@@ -379,7 +442,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     confirmGuess() {
       if (!this.pendingGuess || !this.canGuess) return;
-      clearInterval(this.roundTimer);
+      this.stopAllTimers();
       if (!this.currentImageLoadedSuccessfully) {
         alert("Please wait for the image to load or for a replacement to be found.");
         return;
@@ -418,20 +481,29 @@ document.addEventListener("DOMContentLoaded", () => {
           this.elements.nextBtn.textContent = 'Back to Menu';
           this.elements.nextBtn.hidden = false;
         } else {
-          this.showFinalResults();
+          this.elements.endGameBtn.hidden = false;
         }
       } else {
         this.elements.nextBtn.hidden = false;
       }
     }
+    
+    stopAllTimers() {
+        clearInterval(this.roundTimer);
+        clearTimeout(this.imageFadeTimer);
+    }
+
     hideGameAndShowMenu() {
-      clearInterval(this.roundTimer);
+      this.stopAllTimers();
       this.elements.gameUI.hidden = true;
       this.elements.menu.hidden = false;
+      this.elements.menuBackground.hidden = false;
+      document.body.classList.remove('menu-active');
       this.elements.mapImage.style.transform = 'none';
       this.elements.nextBtn.textContent = 'Next Round';
       this.elements.timerDisplay.hidden = false;
       this.displayLeaderboard();
+      this.populatePracticeGrid();
     }
     showFinalResults() {
       const maxScore = 200 * this.shuffledTracks.length;
@@ -491,20 +563,38 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   const elements = {
-    menu: document.getElementById("menu"), gameUI: document.getElementById("game"), startBtn: document.getElementById("start-btn"),
+    menu: document.getElementById("menu"), 
+    menuBackground: document.getElementById('menu-background'),
+    initialStartBtn: document.getElementById('initial-start-btn'),
+    gameUI: document.getElementById("game"), 
+    startBtn: document.getElementById("start-btn"),
     seedInput: document.getElementById("seed"),
     mirrorModeCheckbox: document.getElementById("mirror-mode"),
-    trackWrapper: document.getElementById("track-wrapper"), trackContainer: document.getElementById("track-container"),
-    trackImage: document.getElementById("track-image"), confirmBtn: document.getElementById("confirm-btn"), nextBtn: document.getElementById("next-btn"),
-    roundDisplay: document.getElementById("round-display"), scoreDisplay: document.getElementById("score-display"),
-    resultText: document.getElementById("result"), mapWrapper: document.getElementById("map-wrapper"), mapContainer: document.getElementById("map-container"),
+    trackWrapper: document.getElementById("track-wrapper"), 
+    trackContainer: document.getElementById("track-container"),
+    trackImage: document.getElementById("track-image"), 
+    confirmBtn: document.getElementById("confirm-btn"), 
+    nextBtn: document.getElementById("next-btn"),
+    roundDisplay: document.getElementById("round-display"), 
+    scoreDisplay: document.getElementById("score-display"),
+    resultText: document.getElementById("result"), 
+    mapWrapper: document.getElementById("map-wrapper"), 
+    mapContainer: document.getElementById("map-container"),
     mapImage: document.getElementById("track-map"),
-    markerGuess: document.getElementById("marker-guess"), markerPlayer: document.getElementById("marker-player"), markerAnswer: document.getElementById("marker-answer"),
-    guessLine: document.getElementById("guess-line"), statusText: document.getElementById("used-images-status"), resetUsedBtn: document.getElementById("reset-used-btn"),
-    leaderboardList: document.getElementById("leaderboard-list"), backToMenuBtn: document.getElementById("back-to-menu-btn"),
-    endGameModal: document.getElementById("end-game-modal"), modalFinalScore: document.getElementById("modal-final-score"),
-    saveScoreForm: document.getElementById("save-score-form"), playerNameInput: document.getElementById("player-name-input"),
-    saveScoreBtn: document.getElementById("save-score-btn"), modalPlayAgainBtn: document.getElementById("modal-play-again-btn"),
+    markerGuess: document.getElementById("marker-guess"), 
+    markerPlayer: document.getElementById("marker-player"), 
+    markerAnswer: document.getElementById("marker-answer"),
+    guessLine: document.getElementById("guess-line"), 
+    statusText: document.getElementById("used-images-status"), 
+    resetUsedBtn: document.getElementById("reset-used-btn"),
+    leaderboardList: document.getElementById("leaderboard-list"), 
+    backToMenuBtn: document.getElementById("back-to-menu-btn"),
+    endGameModal: document.getElementById("end-game-modal"), 
+    modalFinalScore: document.getElementById("modal-final-score"),
+    saveScoreForm: document.getElementById("save-score-form"), 
+    playerNameInput: document.getElementById("player-name-input"),
+    saveScoreBtn: document.getElementById("save-score-btn"), 
+    modalPlayAgainBtn: document.getElementById("modal-play-again-btn"),
     modalBackToMenuBtn: document.getElementById("modal-back-to-menu-btn"),
     modalSeedContainer: document.getElementById("modal-seed-container"),
     themeSelector: document.getElementById('theme-selector'),
@@ -514,39 +604,50 @@ document.addEventListener("DOMContentLoaded", () => {
     timerDisplay: document.getElementById('timer-display'),
     practiceGrid: document.getElementById('practice-grid'),
     trackCredit: document.getElementById('track-credit'),
+    fadeTimerInput: document.getElementById('fade-timer-input'),
+    fadeTimerCheckbox: document.getElementById('fade-timer-checkbox'),
+    endGameBtn: document.getElementById('end-game-btn'),
   };
   
   new Game(elements);
 
+  elements.initialStartBtn.addEventListener('click', () => {
+    document.body.classList.add('menu-active');
+  });
+
   elements.unlimitedTimeCheckbox.addEventListener('change', (e) => {
     elements.roundTimerInput.disabled = e.target.checked;
   });
+  elements.fadeTimerCheckbox.addEventListener('change', (e) => {
+    elements.fadeTimerInput.disabled = !e.target.checked;
+  });
+  elements.fadeTimerCheckbox.dispatchEvent(new Event('change'));
 
   const THEME_KEY = 'marioKartGeoGuessr_theme';
   const CUSTOM_COLOR_KEY = 'marioKartGeoGuessr_customColor';
   
   function applyTheme(theme, customColor) {
-    document.body.classList.remove('theme-dark', 'theme-darker', 'theme-black');
-    document.body.style.setProperty('--background-color', '');
-    document.body.style.setProperty('--text-color', '');
+    document.documentElement.classList.remove('theme-dark', 'theme-darker', 'theme-black');
+    document.documentElement.style.setProperty('--background-color', '');
+    document.documentElement.style.setProperty('--text-color', '');
     if (theme === 'custom') {
       elements.customBgColorInput.hidden = false;
-      document.body.style.setProperty('--background-color', customColor);
+      document.documentElement.style.setProperty('--background-color', customColor);
       const hex = customColor.replace('#', '');
       const r = parseInt(hex.substring(0, 2), 16);
       const g = parseInt(hex.substring(2, 4), 16);
       const b = parseInt(hex.substring(4, 6), 16);
       const brightness = (r * 299 + g * 587 + b * 114) / 1000;
       const textColor = brightness > 125 ? '#000000' : '#FFFFFF';
-      document.body.style.setProperty('--text-color', textColor);
+      document.documentElement.style.setProperty('--text-color', textColor);
     } else {
       elements.customBgColorInput.hidden = true;
       if (theme !== 'light') {
-        document.body.classList.add(`theme-${theme}`);
+        document.documentElement.classList.add(`theme-${theme}`);
       }
     }
   }
-  function loadTheme() {
+  function loadAndSetThemeUI() {
     const savedTheme = localStorage.getItem(THEME_KEY) || 'light';
     const savedCustomColor = localStorage.getItem(CUSTOM_COLOR_KEY) || '#f0f0f0';
     elements.themeSelector.value = savedTheme;
@@ -566,5 +667,6 @@ document.addEventListener("DOMContentLoaded", () => {
       applyTheme('custom', customColor);
     }
   });
-  loadTheme();
+  
+  loadAndSetThemeUI();
 });

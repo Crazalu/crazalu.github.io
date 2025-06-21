@@ -1,9 +1,20 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"> <!-- The theme class will be applied here -->
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mario Kart GeoGuessr</title>
+  
+  <script>
+    (function() {
+      const THEME_KEY = 'marioKartGeoGuessr_theme';
+      const savedTheme = localStorage.getItem(THEME_KEY) || 'light';
+      if (savedTheme !== 'light') {
+        document.documentElement.classList.add(`theme-${savedTheme}`);
+      }
+    })();
+  </script>
+  
   <link rel="stylesheet" href="style.css" />
   <script src="data.js"></script>
   <script src="script.js" defer></script>
@@ -12,8 +23,14 @@
 
 <body>
 
+  <!-- ++ NEW: Background container for the logo ++ -->
+  <div id="menu-background">
+    <img src="map/logo.webp" alt="Mario Kart GeoGuessr Logo">
+    <button id="initial-start-btn">Click to Start</button>
+  </div>
+
   <div id="menu" class="container">
-    <h1>Mario Kart GeoGuessr</h1>
+    <h1><img src="map/logo.webp" alt="Mario Kart GeoGuessr Logo" class="logo-image"></h1>
     <div class="menu-main">
       <div class="menu-controls">
         <label for="seed">Game Seed:</label>
@@ -30,6 +47,15 @@
           <div class="checkbox-wrapper">
             <input type="checkbox" id="unlimited-time-checkbox" checked>
             <label for="unlimited-time-checkbox">Unlimited</label>
+          </div>
+        </div>
+        
+        <div class="timer-controls">
+          <label for="fade-timer-input">Image Fade (s):</label>
+          <input type="number" id="fade-timer-input" value="10" min="1">
+           <div class="checkbox-wrapper">
+            <input type="checkbox" id="fade-timer-checkbox">
+            <label for="fade-timer-checkbox">Enable</label>
           </div>
         </div>
         
@@ -51,7 +77,6 @@
         
         <div class="practice-controls">
           <h2>Practice Mode</h2>
-          <!-- ++ MODIFIED: "track" changed to "image" ++ -->
           <p>Click an image to start</p>
           <div id="practice-grid"></div>
         </div>
@@ -71,7 +96,7 @@
   <div id="game" class="container" hidden>
     <div class="game-header">
       <button id="back-to-menu-btn" class="btn-secondary btn-header">Back to Menu</button>
-      <h1>Mario Kart GeoGuessr</h1>
+      <h1><img src="map/logo.webp" alt="Mario Kart GeoGuessr Logo" class="logo-image"></h1>
       <div class="stats">
         <p id="round-display">Round 1 / 5</p>
         <p id="timer-display">Time: --</p>
@@ -82,10 +107,9 @@
     <div class="game-main-area">
       <div id="track-wrapper" class="interactive-area track-wrapper">
         <div id="track-container" class="interactive-area-container">
-          <!-- ++ MODIFIED: "Track Image" changed to "Image" ++ -->
           <img id="track-image" src="" alt="Image to guess">
+          <p id="track-credit"></p>
         </div>
-        <p id="track-credit"></p>
       </div>
       
       <div id="map-wrapper" class="interactive-area map-wrapper">
@@ -105,6 +129,7 @@
       <button id="confirm-btn" hidden>Confirm Guess</button>
       <p id="result"></p>
       <button id="next-btn" hidden>Next Round</button>
+      <button id="end-game-btn" hidden>End Game</button>
     </div>
   </div>
 
