@@ -1,254 +1,188 @@
-
-let gameSeed = null;
-let canGuess = true;
-
-
-function getUsedImages() {
-  const cookie = document.cookie.split('; ').find(row => row.startsWith('usedImages='));
-  return cookie ? JSON.parse(decodeURIComponent(cookie.split('=')[1])) : [];
-}
-
-function setUsedImages(list) {
-  document.cookie = "usedImages=" + encodeURIComponent(JSON.stringify(list)) + "; path=/";
-}
-
-function clearUsedImages() {
-  document.cookie = "usedImages=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-}
-
-// Basic seeded RNG (Mulberry32)
-function mulberry32(seed) {
-  let a = typeof seed === 'string'
-    ? Array.from(seed).reduce((acc, c) => acc + c.charCodeAt(0), 0)
-    : seed;
-
-  return function() {
-    a |= 0; a = a + 0x6D2B79F5 | 0;
-    let t = Math.imul(a ^ a >>> 15, 1 | a);
-    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-    return ((t ^ t >>> 14) >>> 0) / 4294967296;
-  };
-}
-
-function seededShuffle(array, seed) {
-  const rand = mulberry32(seed);
-  const copy = [...array];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-}
+// This is the full script with the "start game" bug fixed.
+// The updateStatusText function is now a method of the Game class.
 
 document.addEventListener("DOMContentLoaded", () => {
-const tracks = [
-  { image: "images/img1.webp",  mapX: 1349,  mapY: 450 },
-  { image: "images/img2.webp",  mapX: 1374, mapY: 1002 },
-  { image: "images/img3.webp",  mapX: 313, mapY: 1121 },
-  { image: "images/img4.webp",  mapX: 300,  mapY: 963 },
-  { image: "images/img5.webp",  mapX: 388, mapY: 457 },
-  { image: "images/img6.webp",  mapX: 321, mapY: 496 },
-  { image: "images/img7.webp",  mapX: 966,  mapY: 808 },
-  { image: "images/img8.webp",  mapX: 901,  mapY: 793 },
-  { image: "images/img9.webp",  mapX: 915, mapY: 634 },
-  { image: "images/img10.webp", mapX: 925, mapY: 603 },
-  { image: "images/img11.webp", mapX: 1671,  mapY: 621 },
-  { image: "images/img12.webp", mapX: 1594, mapY: 728 },
-  { image: "images/img13.webp", mapX: 1497, mapY: 626 },
-  { image: "images/img14.webp", mapX: 1526,  mapY: 572 },
-  { image: "images/img15.webp", mapX: 1136, mapY: 1350 },
-  { image: "images/img16.webp", mapX: 1197,  mapY: 1284 },
-  { image: "images/img17.webp", mapX: 1105, mapY: 1081 },
-  { image: "images/img18.webp", mapX: 1540, mapY: 1230 },
-  { image: "images/img19.webp", mapX: 1350, mapY: 800 },
-  { image: "images/img20.webp", mapX: 950,  mapY: 1200 },
-  { image: "images/img21.webp", mapX: 1250, mapY: 600,  enabled: false },
-  { image: "images/img22.webp", mapX: 600,  mapY: 1000, enabled: false },
-  { image: "images/img23.webp", mapX: 1550, mapY: 1150, enabled: false },
-  { image: "images/img24.webp", mapX: 500,  mapY: 1450, enabled: false },
-  { image: "images/img25.webp", mapX: 1700, mapY: 1050, enabled: false },
-  { image: "images/img26.webp", mapX: 1750, mapY: 600,  enabled: false },
-  { image: "images/img27.webp", mapX: 1600, mapY: 500,  enabled: false },
-  { image: "images/img28.webp", mapX: 1150, mapY: 1350, enabled: false },
-  { image: "images/img29.webp", mapX: 900,  mapY: 1500, enabled: false },
-  { image: "images/img30.webp", mapX: 1000, mapY: 300,  enabled: false }
-];
-
-
+  // --- CONFIGURATION & DATA ---
   const MAX_ROUNDS = 5;
-  let gameSeed, shuffledTracks, currentTrack;
-  let score = 0, round = 0, pendingGuess = null;
-  canGuess = true;
+  const USED_IMAGES_KEY = 'marioKartGeoGuessr_usedImages';
+  const TRACKS_DATA = [
+    // Your track data remains here...
+    { image: "images/img1.webp",  mapX: 1349, mapY: 450 },
+    { image: "images/img2.webp",  mapX: 1374, mapY: 1002 },
+    { image: "images/img3.webp",  mapX: 313, mapY: 1121 },
+    { image: "images/img4.webp",  mapX: 300,  mapY: 963 },
+    { image: "images/img5.webp",  mapX: 388, mapY: 457 },
+    { image: "images/img6.webp",  mapX: 321, mapY: 496 },
+    { image: "images/img7.webp",  mapX: 966,  mapY: 808 },
+    { image: "images/img8.webp",  mapX: 901,  mapY: 793 },
+    { image: "images/img9.webp",  mapX: 915, mapY: 634 },
+    { image: "images/img10.webp", mapX: 925, mapY: 603 },
+    { image: "images/img11.webp", mapX: 1671,  mapY: 621 },
+    { image: "images/img12.webp", mapX: 1594, mapY: 728 },
+    { image: "images/img13.webp", mapX: 1497, mapY: 626 },
+    { image: "images/img14.webp", mapX: 1526,  mapY: 572 },
+    { image: "images/img15.webp", mapX: 1136, mapY: 1350 },
+    { image: "images/img16.webp", mapX: 1197,  mapY: 1284 },
+    { image: "images/img17.webp", mapX: 1105, mapY: 1081 },
+    { image: "images/img18.webp", mapX: 1540, mapY: 1230 },
+    { image: "images/img19.webp", mapX: 1350, mapY: 800 },
+    { image: "images/img20.webp", mapX: 950,  mapY: 1200 },
+    { image: "images/img21.webp", mapX: 1405, mapY: 1141 },
+    { image: "images/img22.webp", mapX: 600,  mapY: 1000, enabled: false },
+    { image: "images/img23.webp", mapX: 1550, mapY: 1150, enabled: false },
+    { image: "images/img24.webp", mapX: 500,  mapY: 1450, enabled: false },
+    { image: "images/img25.webp", mapX: 1700, mapY: 1050, enabled: false },
+    { image: "images/img26.webp", mapX: 1750, mapY: 600,  enabled: false },
+    { image: "images/img27.webp", mapX: 1600, mapY: 500,  enabled: false },
+    { image: "images/img28.webp", mapX: 1150, mapY: 1350, enabled: false },
+    { image: "images/img29.webp", mapX: 900,  mapY: 1500, enabled: false },
+    { image: "images/img30.webp", mapX: 1000, mapY: 300,  enabled: false }
+  ];
 
-  const menu = document.getElementById("menu");
-  const startBtn = document.getElementById("start-btn");
-  const gameUI = document.getElementById("game");
-  const trackWrapper = document.getElementById("track-wrapper");
-  const trackContainer = document.getElementById("track-container");
-  const trackImage = document.getElementById("track-image");
-  const confirmBtn = document.getElementById("confirm-btn");
-  const nextBtn = document.getElementById("next-btn");
-  const restartBtn = document.getElementById("restart-btn");
-  const roundDisplay = document.getElementById("round-display");
-  const scoreDisplay = document.getElementById("score-display");
-  const resultText = document.getElementById("result");
+  // --- LOCALSTORAGE & UTILITY FUNCTIONS ---
+  const getUsedImages = () => JSON.parse(localStorage.getItem(USED_IMAGES_KEY)) || [];
+  const setUsedImages = (list) => localStorage.setItem(USED_IMAGES_KEY, JSON.stringify(list));
+  const clearUsedImages = () => localStorage.removeItem(USED_IMAGES_KEY);
 
-  const mapWrapper = document.getElementById("map-wrapper");
-  const mapContainer = document.getElementById("map-container");
-  const markerGuess = document.getElementById("marker-guess");
-  const markerPlayer = document.getElementById("marker-player");
-  const markerAnswer = document.getElementById("marker-answer");
-  const guessLine = document.getElementById("guess-line").querySelector("line");
+  const getLeaderboard = (key = LEADERBOARD_KEY) => JSON.parse(localStorage.getItem(key)) || [];
+  const setLeaderboard = (scores, key = LEADERBOARD_KEY) => localStorage.setItem(key, JSON.stringify(scores));
+  
+  // Generates a simple "fingerprint" of the track data to validate seeded leaderboards
+  const generateDataHash = (data) => JSON.stringify(data).split('').reduce((acc, char) => (acc * 31 + char.charCodeAt(0)) | 0, 0);
 
-  function mulberry32(a) {
-    return function() {
-      a |= 0; a = a + 0x6D2B79F5 | 0;
-      let t = Math.imul(a ^ a >>> 15, 1 | a);
-      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-      return ((t ^ t >>> 14) >>> 0) / 4294967296;
-    };
-  }
+  function mulberry32(seed) { let a=typeof seed==='string'?Array.from(seed).reduce((a,c)=>a+c.charCodeAt(0),0):seed; return function(){a|=0;a=a+1831565813|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+  function seededShuffle(array, seed) { const r=mulberry32(seed);const c=[...array];for(let i=c.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[c[i],c[j]]=[c[j],c[i]]}return c }
 
-  function seededShuffle(arr, seed) {
-    const rand = mulberry32(typeof seed==="string"
-      ? Array.from(seed).reduce((a,c)=>a+c.charCodeAt(0),0)
-      : seed);
-    const a = [...arr];
-    for (let i = a.length-1; i>0; i--) {
-      const j = Math.floor(rand()*(i+1));
-      [a[i], a[j]] = [a[j], a[i]];
+  // --- PAN/ZOOM CLASS (with 'fit' and improved reset) ---
+  class PanZoom {
+    constructor(wrapper, container, options = {}) {
+      this.wrapper = wrapper; this.container = container; this.offset = { x: 0, y: 0 }; this.isDown = false; this.prevPos = { x: 0, y: 0 }; this.options = options;
+      
+      this.initialScale = 1;
+      if (options.fit) {
+        const wW = this.wrapper.clientWidth; const wH = this.wrapper.clientHeight;
+        const cW = this.container.scrollWidth; const cH = this.container.scrollHeight;
+        if (cW > 0 && cH > 0) { this.initialScale = Math.min(wW / cW, wH / cH); }
+      }
+      this.scale = this.initialScale;
+      this.minScale = this.initialScale;
+      this.maxScale = this.initialScale * (options.maxZoom || 4);
+      
+      this.bindEvents(); this.wrapper.style.cursor = 'grab'; this.updateTransform();
     }
-    return a;
+    updateTransform() { /* ... unchanged ... */ const wW = this.wrapper.clientWidth; const wH = this.wrapper.clientHeight; const cW = this.container.scrollWidth; const cH = this.container.scrollHeight; const mX = Math.max(0, cW * this.scale - wW); const mY = Math.max(0, cH * this.scale - wH); const oX = mX / this.scale; const oY = mY / this.scale; this.offset.x = Math.max(-oX, Math.min(0, this.offset.x)); this.offset.y = Math.max(-oY, Math.min(0, this.offset.y)); this.container.style.transform = `scale(${this.scale}) translate(${this.offset.x}px, ${this.offset.y}px)`; }
+    bindEvents() { /* ... unchanged ... */ this.wrapper.addEventListener('wheel', this.handleWheel.bind(this)); this.wrapper.addEventListener('mousedown', this.handleMouseDown.bind(this)); window.addEventListener('mousemove', this.handleMouseMove.bind(this)); window.addEventListener('mouseup', this.handleMouseUp.bind(this)); }
+    handleWheel(e) { /* ... unchanged ... */ e.preventDefault(); const oS = this.scale; this.scale = Math.min(this.maxScale, Math.max(this.minScale, this.scale + (e.deltaY < 0 ? 0.1 * this.initialScale : -0.1 * this.initialScale))); if (oS === this.scale) return; const r = this.wrapper.getBoundingClientRect(); const mX = e.clientX - r.left; const mY = e.clientY - r.top; this.offset.x = mX / oS - (mX / this.scale) + this.offset.x; this.offset.y = mY / oS - (mY / this.scale) + this.offset.y; this.updateTransform(); }
+    handleMouseDown(e) { /* ... unchanged ... */ this.isDown = true; this.prevPos = { x: e.clientX, y: e.clientY }; this.wrapper.classList.add('grabbing'); }
+    handleMouseMove(e) { /* ... unchanged ... */ if (!this.isDown) return; this.offset.x += (e.clientX - this.prevPos.x) / this.scale; this.offset.y += (e.clientY - this.prevPos.y) / this.scale; this.prevPos = { x: e.clientX, y: e.clientY }; this.updateTransform(); }
+    handleMouseUp() { /* ... unchanged ... */ this.isDown = false; this.wrapper.classList.remove('grabbing'); }
+    reset() { this.scale = this.initialScale; this.offset = { x: 0, y: 0 }; this.updateTransform(); }
   }
 
-  function loadTrack() {
-    currentTrack = shuffledTracks[round];
-    trackImage.src = currentTrack.image;
-    markerGuess.style.display=markerPlayer.style.display=markerAnswer.style.display="none";
-    guessLine.style.display="none";
-    confirmBtn.style.display="none";
-    nextBtn.style.display="none";
-    pendingGuess = null;
-    roundDisplay.textContent = `Round ${round+1} / ${MAX_ROUNDS}`;
-  }
-
-  startBtn.onclick = () => {
-    const seedVal = document.getElementById("seed").value;
-    gameSeed = seedVal || Math.floor(Math.random()*100000);
-    const enabledTracks = tracks.filter(t => t.enabled !== false);
-    shuffledTracks = seededShuffle(enabledTracks, gameSeed).slice(0, MAX_ROUNDS);    score = round = 0;
-    scoreDisplay.textContent = "Score: 0";
-    menu.style.display="none"; gameUI.style.display="block";
-    loadTrack();
-  };
-
-nextBtn.onclick = () => {
-    round++;
-    if (round >= MAX_ROUNDS) {
-        showResults();
-    } else {
-        canGuess = true;
-        loadTrack();
+  // --- MAIN GAME CLASS ---
+  class Game {
+    constructor(elements) {
+      this.elements = elements;
+      this.trackPanZoom = new PanZoom(elements.trackWrapper, elements.trackContainer);
+      // Initialize map with the 'fit' option to make it start zoomed out
+      this.mapPanZoom = new PanZoom(elements.mapWrapper, elements.mapContainer, { fit: true, maxZoom: 8 });
+      this.bindEvents();
+      this.updateStatusText();
+      this.displayLeaderboard();
     }
-};
+    
+    updateStatusText() { /* ... unchanged ... */ const totalEnabled = TRACKS_DATA.filter(t => t.enabled !== false).length; const usedCount = getUsedImages().length; this.elements.statusText.textContent = `You have seen ${usedCount} of ${totalEnabled} tracks.`; }
+    displayLeaderboard() { /* ... unchanged ... */ const scores = getLeaderboard(); const list = this.elements.leaderboardList; list.innerHTML = ''; if (scores.length === 0) { list.innerHTML = `<li class="no-scores">No high scores yet!</li>`; return; } scores.forEach(entry => { const li = document.createElement('li'); li.innerHTML = `<span>${entry.name}</span><span class="score">${entry.score}</span>`; list.appendChild(li); }); }
 
-  restartBtn.onclick = () => { startBtn.click(); };
+    bindEvents() {
+      this.elements.startBtn.addEventListener('click', () => this.start());
+      this.elements.restartBtn.addEventListener('click', () => this.start());
+      this.elements.nextBtn.addEventListener('click', () => this.nextRound());
+      this.elements.confirmBtn.addEventListener('click', () => this.confirmGuess());
+      this.elements.mapWrapper.addEventListener('click', (e) => this.handleMapClick(e));
+      this.elements.resetUsedBtn.addEventListener('click', () => { if (confirm("Are you sure? This will reset your seen images history.")) { clearUsedImages(); this.updateStatusText(); alert("Seen images have been reset!"); } });
+      this.elements.backToMenuBtn.addEventListener('click', () => { if (confirm("Are you sure you want to quit? Your score will not be saved.")) { this.elements.gameUI.hidden = true; this.elements.menu.hidden = false; this.displayLeaderboard(); } });
+    }
 
-  // Track pan/zoom
-  let tScale=1, tO= {x:0,y:0}, tDown=false, tPrev={x:0,y:0};
-  function updateTrack() {
-    tO.x = Math.min(Math.max(tO.x, -(600*(tScale-1))).toFixed(2), 0);
-    tO.y = Math.min(Math.max(tO.y, -(400*(tScale-1))).toFixed(2), 0);
-    trackContainer.style.transform=`scale(${tScale}) translate(${tO.x}px,${tO.y}px)`;
+    start() {
+      // ++ HOW TO HARDCODE A SEED ++
+      // To force a seed for a challenge, uncomment the next line and set your desired seed.
+      // const hardcodedSeed = "CHALLENGE123";
+      const seedVal = (typeof hardcodedSeed !== 'undefined') ? hardcodedSeed : this.elements.seedInput.value.trim();
+
+      this.gameSeed = seedVal !== '' ? seedVal : Math.floor(Math.random() * 100000);
+      this.isSeededGame = seedVal !== '';
+
+      const enabledTracks = TRACKS_DATA.filter(t => t.enabled !== false);
+      let availableTracks = this.isSeededGame ? enabledTracks : enabledTracks.filter(track => !getUsedImages().includes(track.image));
+
+      if (!this.isSeededGame && availableTracks.length < MAX_ROUNDS) {
+        if (getUsedImages().length > 0) alert("Not enough new tracks. Resetting the cycle for you!");
+        clearUsedImages(); this.updateStatusText(); availableTracks = enabledTracks;
+      }
+      
+      if (availableTracks.length === 0) { alert("Error: No tracks are available to play."); return; }
+
+      this.shuffledTracks = seededShuffle(availableTracks, this.gameSeed).slice(0, MAX_ROUNDS);
+      this.score = 0; this.round = 0;
+      
+      this.elements.scoreDisplay.textContent = "Score: 0";
+      this.elements.menu.hidden = true; this.elements.gameUI.hidden = false;
+      
+      this.loadRound();
+    }
+
+    loadRound() { /* ... unchanged from previous version, but now reset() is more effective ... */ this.canGuess = true; this.currentTrack = this.shuffledTracks[this.round]; this.elements.trackImage.src = this.currentTrack.image; this.pendingGuess = null; this.trackPanZoom.reset(); this.mapPanZoom.reset(); this.elements.markerGuess.hidden = true; this.elements.markerPlayer.hidden = true; this.elements.markerAnswer.hidden = true; this.elements.guessLine.style.display = 'none'; this.elements.confirmBtn.hidden = true; this.elements.nextBtn.hidden = true; this.elements.restartBtn.hidden = true; this.elements.resultText.textContent = ""; this.elements.roundDisplay.textContent = `Round ${this.round + 1} / ${MAX_ROUNDS}`; }
+    nextRound() { /* ... unchanged ... */ this.round++; if (this.round >= MAX_ROUNDS) { this.showFinalResults(); } else { this.loadRound(); } }
+    handleMapClick(e) { /* ... unchanged ... */ if (!this.canGuess || this.mapPanZoom.isDown) return; const rect = this.elements.mapWrapper.getBoundingClientRect(); const { scale, offset } = this.mapPanZoom; const guessX = (e.clientX - rect.left) / scale - offset.x; const guessY = (e.clientY - rect.top) / scale - offset.y; this.pendingGuess = { x: guessX, y: guessY }; this.elements.markerGuess.style.left = `${guessX}px`; this.elements.markerGuess.style.top = `${guessY}px`; this.elements.markerGuess.hidden = false; this.elements.confirmBtn.hidden = false; }
+    confirmGuess() { /* ... unchanged ... */ if (!this.pendingGuess) return; this.canGuess = false; const dx = this.pendingGuess.x - this.currentTrack.mapX; const dy = this.pendingGuess.y - this.currentTrack.mapY; const distance = Math.hypot(dx, dy); let points = 0; if (distance <= 15) points = 200; else if (distance <= 200) points = Math.round(200 - distance); this.score += points; this.elements.scoreDisplay.textContent = `Score: ${this.score}`; this.elements.resultText.textContent = `Distance: ${Math.round(distance)}px | +${points} pts`; if (!this.isSeededGame) { setUsedImages([...new Set([...getUsedImages(), this.currentTrack.image])]); } this.elements.markerPlayer.style.left = `${this.pendingGuess.x}px`; this.elements.markerPlayer.style.top = `${this.pendingGuess.y}px`; this.elements.markerAnswer.style.left = `${this.currentTrack.mapX}px`; this.elements.markerAnswer.style.top = `${this.currentTrack.mapY}px`; this.elements.markerPlayer.hidden = false; this.elements.markerAnswer.hidden = false; this.elements.guessLine.setAttribute("x1", this.currentTrack.mapX); this.elements.guessLine.setAttribute("y1", this.currentTrack.mapY); this.elements.guessLine.setAttribute("x2", this.pendingGuess.x); this.elements.guessLine.setAttribute("y2", this.pendingGuess.y); this.elements.guessLine.style.display = "block"; this.elements.markerGuess.hidden = true; this.elements.confirmBtn.hidden = true; if (this.round < MAX_ROUNDS - 1) { this.elements.nextBtn.hidden = false; } else { this.elements.restartBtn.hidden = false; } }
+    
+    showFinalResults() {
+      this.elements.resultText.textContent = `Game Over! Final Score: ${this.score}`;
+      this.elements.nextBtn.hidden = true;
+      this.checkAndAddScore(this.score, this.gameSeed, this.isSeededGame);
+    }
+    
+    checkAndAddScore(score, seed, isSeeded) {
+      if (score === 0) return;
+      
+      let scores, key, dataHash;
+      if (isSeeded) {
+        key = `${LEADERBOARD_KEY}_seed_${seed}`;
+        const storedData = getLeaderboard(key);
+        dataHash = generateDataHash(TRACKS_DATA);
+        
+        // If the hash doesn't match, the track data has changed, so the leaderboard is invalid.
+        if (storedData.hash && storedData.hash !== dataHash) {
+          alert(`The track data has changed since this seed was last played. The leaderboard for seed "${seed}" has been reset.`);
+          scores = [];
+        } else {
+          scores = storedData.scores || [];
+        }
+      } else {
+        key = LEADERBOARD_KEY;
+        scores = getLeaderboard(key);
+      }
+
+      const lowestScore = scores.length > 0 ? scores[scores.length - 1].score : 0;
+      
+      if (score > lowestScore || scores.length < LEADERBOARD_MAX_ENTRIES) {
+        let name = prompt(`You got a high score of ${score}! Enter your name (max 10 chars):`);
+        if (name) {
+          name = name.substring(0, 10).trim() || "Player";
+          let newScores = [...scores, { name, score }].sort((a, b) => b.score - a.score).slice(0, LEADERBOARD_MAX_ENTRIES);
+          
+          if (isSeeded) {
+            setLeaderboard({ hash: dataHash, scores: newScores }, key);
+          } else {
+            setLeaderboard(newScores, key);
+          }
+        }
+      }
+    }
   }
-  trackWrapper.addEventListener("wheel", e => {
-    e.preventDefault();
-    const old=tScale;
-    tScale = Math.min(Math.max(tScale + (e.deltaY<0?0.1:-0.1),1),3);
-    const rect=trackWrapper.getBoundingClientRect(),
-          mx=e.clientX-rect.left, my=e.clientY-rect.top,
-          owl=(mx/old)-tO.x, oyl=(my/old)-tO.y;
-    tO.x -= owl-owl*(old/tScale);
-    tO.y -= oyl-oyl*(old/tScale);
-    updateTrack();
-  });
-  trackWrapper.addEventListener("mousedown", e => {
-    tDown=true, tPrev={x:e.clientX,y:e.clientY};
-  });
-  document.addEventListener("mousemove", e => {
-    if(!tDown) return;
-    tO.x += (e.clientX - tPrev.x)/tScale;
-    tO.y += (e.clientY - tPrev.y)/tScale;
-    tPrev={x:e.clientX,y:e.clientY}; updateTrack();
-  });
-  document.addEventListener("mouseup", ()=>tDown=false);
 
-  // Map pan/zoom
-  let mScale=1, mO={x:0,y:0}, mDown=false, mPrev={x:0,y:0};
-  function updateMap() {
-    const maxX = -(1900*mScale -950),
-          maxY = -(1661*mScale -830);
-    mO.x = Math.min(Math.max(mO.x, maxX),0);
-    mO.y = Math.min(Math.max(mO.y, maxY),0);
-    mapContainer.style.transform=`scale(${mScale}) translate(${mO.x}px,${mO.y}px)`;
-  }
-  mapWrapper.addEventListener("wheel", e => {
-    e.preventDefault();
-    const old=mScale;
-    mScale = Math.min(Math.max(mScale + (e.deltaY<0?0.1:-0.1),1),3);
-    const rect=mapWrapper.getBoundingClientRect(),
-          mx=e.clientX-rect.left, my=e.clientY-rect.top,
-          owl=(mx/old)-mO.x, oyl=(my/old)-mO.y;
-    mO.x -= owl-owl*(old/mScale);
-    mO.y -= oyl-oyl*(old/mScale);
-    updateMap();
-  });
-  mapWrapper.addEventListener("mousedown", e => {
-    mDown=true; mPrev={x:e.clientX,y:e.clientY};
-  });
-  document.addEventListener("mousemove", e => {
-    if(!mDown) return;
-    mO.x += (e.clientX - mPrev.x)/mScale;
-    mO.y += (e.clientY - mPrev.y)/mScale;
-    mPrev={x:e.clientX,y:e.clientY}; updateMap();
-  });
-  document.addEventListener("mouseup", ()=>mDown=false);
-
-  // Guess click
-  mapWrapper.addEventListener("click", e => {
-    if (!canGuess) return;
-    const rect=mapWrapper.getBoundingClientRect(),
-          cx=e.clientX-rect.left, cy=e.clientY-rect.top,
-          gx = (cx/mScale) - mO.x,
-          gy = (cy/mScale) - mO.y;
-    pendingGuess = {x: gx, y: gy};
-    markerGuess.style.left=`${gx}px`; markerGuess.style.top=`${gy}px`;
-    markerGuess.style.display="block"; confirmBtn.style.display="inline-block";
-  });
-
-  confirmBtn.onclick = () => {
-    if(!pendingGuess) return;
-    const dx=pendingGuess.x-currentTrack.mapX,
-          dy=pendingGuess.y-currentTrack.mapY,
-          dist=Math.hypot(dx,dy);
-    let pts=0;
-    if(dist<=15) pts=200;
-    else if(dist<=200) pts=Math.round(200-dist);
-    score+=pts; scoreDisplay.textContent=`Score: ${score}`;
-    resultText.textContent=`Distance: ${Math.round(dist)}px | +${pts} pts`;
-    markerPlayer.style.left=`${pendingGuess.x}px`;
-    markerPlayer.style.top=`${pendingGuess.y}px`; markerPlayer.style.display="block";
-    markerAnswer.style.left=`${currentTrack.mapX}px`;
-    markerAnswer.style.top=`${currentTrack.mapY}px`; markerAnswer.style.display="block";
-    guessLine.setAttribute("x1", currentTrack.mapX);
-    guessLine.setAttribute("y1", currentTrack.mapY);
-    guessLine.setAttribute("x2", pendingGuess.x);
-    guessLine.setAttribute("y2", pendingGuess.y);
-    guessLine.style.display = "block";
-    canGuess = false;
-    guessLine.style.display="block";
-    confirmBtn.style.display="none";
-    nextBtn.style.display=(round<MAX_ROUNDS-1?"inline-block":"none");
-    restartBtn.style.display=(round>=MAX_ROUNDS-1?"inline-block":"none");
-  };
+  // --- INITIALIZATION ---
+  const elements = { /* ... unchanged ... */ menu: document.getElementById("menu"), gameUI: document.getElementById("game"), startBtn: document.getElementById("start-btn"), seedInput: document.getElementById("seed"), trackWrapper: document.getElementById("track-wrapper"), trackContainer: document.getElementById("track-container"), trackImage: document.getElementById("track-image"), confirmBtn: document.getElementById("confirm-btn"), nextBtn: document.getElementById("next-btn"), restartBtn: document.getElementById("restart-btn"), roundDisplay: document.getElementById("round-display"), scoreDisplay: document.getElementById("score-display"), resultText: document.getElementById("result"), mapWrapper: document.getElementById("map-wrapper"), mapContainer: document.getElementById("map-container"), markerGuess: document.getElementById("marker-guess"), markerPlayer: document.getElementById("marker-player"), markerAnswer: document.getElementById("marker-answer"), guessLine: document.getElementById("guess-line"), statusText: document.getElementById("used-images-status"), resetUsedBtn: document.getElementById("reset-used-btn"), leaderboardList: document.getElementById("leaderboard-list"), backToMenuBtn: document.getElementById("back-to-menu-btn"), };
+  new Game(elements);
 });

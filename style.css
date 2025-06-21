@@ -1,75 +1,107 @@
+:root {
+  --background-color: #f0f0f0;
+  --text-color: #333;
+  --border-color: #444;
+  --map-bg-color: #3E7BB6;
+  --primary-button-bg: #007bff;
+  --primary-button-text: white;
+  --secondary-button-bg: #6c757d;
+  --line-color: red;
+  --border-radius: 10px;
+}
+
 body {
-  font-family: sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   text-align: center;
-  background: #f0f0f0;
+  background-color: var(--background-color);
+  color: var(--text-color);
   margin: 0;
   padding: 1em;
-}
-h1 { margin-bottom: 10px; }
-#round-display { font-size: 1.2em; margin-bottom: 10px; }
-
-.track-wrapper {
-  width: 600px;
-  height: 400px;
-  overflow: hidden;
-  border: 3px solid #444;
-  border-radius: 10px;
-  margin: 0 auto 20px;
-  position: relative;
-  cursor: grab;
-}
-.track-container {
-  position: relative;
-  width: 600px;
-  height: 400px;
-  transform-origin: top left;
-}
-#track-image {
-  width: 100%;
-  height: 100%;
-  display: block;
-  user-select: none;
-  pointer-events: none;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
 }
 
-.map-wrapper {
-  width: 950px;
-  height: 830px;
-  margin: 0 auto 20px;
-  overflow: hidden;
-  border: 2px solid #222;
-  border-radius: 10px;
-  position: relative;
-  cursor: crosshair;
-  background: #3E7BB6;
+h1 { margin-top: 0; margin-bottom: 20px; }
+h2 { margin-top: 0; }
+
+.container { width: 100%; max-width: 950px; padding: 1em; }
+
+/* --- Menu Styles --- */
+.menu-main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  justify-content: center;
+  align-items: flex-start;
+  margin-bottom: 20px;
 }
-.map-container {
-  position: relative;
-  width: 1900px;
-  height: 1661px;
-  transform-origin: top left;
+.menu-controls { flex: 1 1 300px; }
+
+/* --- Leaderboard Styles --- */
+.leaderboard-container {
+  border: 2px solid #ccc;
+  border-radius: var(--border-radius);
+  padding: 1.5em;
+  background-color: #fff;
+  flex: 1 1 300px;
+  min-width: 280px;
+}
+#leaderboard-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+}
+#leaderboard-list li {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 4px;
+  border-bottom: 1px solid #eee;
+  font-size: 1.1em;
+}
+#leaderboard-list li:last-child { border-bottom: none; }
+#leaderboard-list .score { font-weight: bold; }
+#leaderboard-list .no-scores { text-align: center; color: #888; font-style: italic; }
+
+/* --- Game Screen Styles --- */
+.game-header { position: relative; margin-bottom: 20px; }
+.stats { display: flex; justify-content: space-around; font-size: 1.2em; font-weight: bold; }
+.stats p { margin: 0; }
+
+.interactive-area { width: 100%; overflow: hidden; border: 3px solid var(--border-color); border-radius: var(--border-radius); margin: 0 auto 20px; position: relative; background-color: #000; }
+.track-wrapper { aspect-ratio: 3 / 2; max-width: 600px; cursor: grab; }
+.map-wrapper { aspect-ratio: 190 / 166; max-width: 950px; cursor: crosshair; background-color: var(--map-bg-color); }
+.interactive-area.grabbing { cursor: grabbing; }
+.interactive-area-container { position: relative; transform-origin: top left; }
+.track-wrapper .interactive-area-container { width: 100%; }
+.map-wrapper .interactive-area-container { width: 1900px; height: 1661px; }
+
+#track-image, #track-map { display: block; user-select: none; pointer-events: none; width: 100%; height: auto; }
+
+.marker { position: absolute; width: 24px; height: 24px; transform: translate(-50%, -50%); pointer-events: none; z-index: 10; }
+.guess-line-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; overflow: visible; }
+#guess-line {
+  stroke: var(--line-color);
+  stroke-width: 3;
+  /* ++ NEW: This creates the dotted/dashed line effect ++ */
+  stroke-dasharray: 10 5;
 }
 
-.marker {
-  position: absolute;
-  width: 24px;
-  height: 24px;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  z-index: 9;
-  display: none;
-}
+.controls { margin-top: 20px; }
+#result { font-size: 1.1em; font-weight: 500; min-height: 1.5em; }
 
-.guess-line {
-  position: absolute;
-  top: 0; left: 0;
-  width: 1900px; 
-  height: 1661px;
-  pointer-events: none;
-  z-index: 5;
-}
-.guess-line line {
-  stroke: red;
-  stroke-width: 2;
-  display: none;
-}
+/* --- Button Styles --- */
+button { padding: 10px 20px; font-size: 1em; border: none; border-radius: 5px; cursor: pointer; background-color: var(--primary-button-bg); color: var(--primary-button-text); transition: background-color 0.2s; margin: 5px; }
+button:hover { background-color: #0056b3; }
+.btn-secondary { background-color: var(--secondary-button-bg); }
+.btn-secondary:hover { background-color: #5a6268; }
+.btn-header { position: absolute; top: 0; left: 0; padding: 5px 10px; font-size: 0.9em; }
+
+input[type="text"] { padding: 8px; margin: 0 10px 10px 5px; border: 1px solid #ccc; border-radius: 5px; }
+
+.menu-footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #ccc; }
+#used-images-status { margin: 0 0 10px 0; color: #555; font-style: italic; }
+
+[hidden] { display: none !important; }
