@@ -5,8 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mario Kart GeoGuessr</title>
   <link rel="stylesheet" href="style.css" />
+  <script src="data.js"></script>
   <script src="script.js" defer></script>
 </head>
+
+
 <body>
 
   <div id="menu" class="container">
@@ -15,6 +18,25 @@
       <div class="menu-controls">
         <label for="seed">Game Seed:</label>
         <input type="text" id="seed" placeholder="Leave blank for random">
+        
+        <div class="checkbox-wrapper">
+          <input type="checkbox" id="mirror-mode">
+          <label for="mirror-mode">Mirror Mode</label>
+        </div>
+        
+        <!-- ++ NEW: Theme Controls ++ -->
+        <div class="theme-controls">
+          <label for="theme-selector">Theme:</label>
+          <select id="theme-selector">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+            <option value="darker">Darker</option>
+            <option value="black">Black</option>
+            <option value="custom">Custom</option>
+          </select>
+          <input type="color" id="custom-bg-color" value="#f0f0f0" hidden>
+        </div>
+        
         <button id="start-btn">Start Game</button>
       </div>
       <div id="leaderboard" class="leaderboard-container">
@@ -28,12 +50,6 @@
     </div>
   </div>
 
-  <!-- ++ MODIFIED SCRIPT LOADING ORDER ++ -->
-  <script src="data.js"></script>
-  <script src="script.js" defer></script>
-</body>
-</html>
-
   <div id="game" class="container" hidden>
     <div class="game-header">
       <button id="back-to-menu-btn" class="btn-secondary btn-header">Back to Menu</button>
@@ -43,29 +59,44 @@
         <p id="score-display">Score: 0</p>
       </div>
     </div>
-    <!-- ... (track and map wrappers remain the same) ... -->
-    <div id="track-wrapper" class="interactive-area track-wrapper"><div id="track-container" class="interactive-area-container"><img id="track-image" src="" alt="Track Image to guess"></div></div>
-    <div id="map-wrapper" class="interactive-area map-wrapper"><div id="map-container" class="interactive-area-container"><img id="track-map" src="map/mk_map.webp" alt="Map of all tracks"><svg class="guess-line-svg"><line id="guess-line" x1="0" y1="0" x2="0" y2="0" /></svg><img id="marker-guess" class="marker" src="images/marker.png" alt="Your guess location" hidden><img id="marker-player" class="marker" src="images/marker.png" alt="Your confirmed guess" hidden><img id="marker-answer" class="marker" src="images/star.png" alt="Correct answer location" hidden></div></div>
+    
+    <div class="game-main-area">
+      <div id="track-wrapper" class="interactive-area track-wrapper">
+        <div id="track-container" class="interactive-area-container">
+          <img id="track-image" src="" alt="Track Image to guess">
+        </div>
+      </div>
+      
+      <div id="map-wrapper" class="interactive-area map-wrapper">
+        <div id="map-container" class="interactive-area-container">
+          <img id="track-map" src="map/mk_map.webp" alt="Map of all tracks">
+          <svg class="guess-line-svg">
+            <line id="guess-line" x1="0" y1="0" x2="0" y2="0" />
+          </svg>
+          <img id="marker-guess" class="marker" src="images/marker.png" alt="Your guess location" hidden>
+          <img id="marker-player" class="marker" src="images/marker.png" alt="Your confirmed guess" hidden>
+          <img id="marker-answer" class="marker" src="images/star.png" alt="Correct answer location" hidden>
+        </div>
+      </div>
+    </div>
+    
     <div class="controls">
       <button id="confirm-btn" hidden>Confirm Guess</button>
       <p id="result"></p>
       <button id="next-btn" hidden>Next Round</button>
-      <button id="restart-btn" hidden>Restart Game</button>
     </div>
   </div>
 
-  <!-- ++ NEW: End-of-Game Modal ++ -->
   <div id="end-game-modal" class="modal-overlay" hidden>
     <div class="modal-content">
       <h2>Game Over!</h2>
       <p id="modal-final-score" class="modal-score"></p>
-      
       <div id="save-score-form" hidden>
         <p><strong>You got a high score!</strong></p>
         <input type="text" id="player-name-input" placeholder="Enter your name" maxlength="10">
         <button id="save-score-btn">Save Score</button>
       </div>
-
+      <div id="modal-seed-container" class="modal-seed-container"></div>
       <div class="modal-actions">
         <button id="modal-play-again-btn">Play Again</button>
         <button id="modal-back-to-menu-btn" class="btn-secondary">Back to Menu</button>
