@@ -1,4 +1,7 @@
+
 let gameSeed = null;
+let canGuess = true;
+
 
 function getUsedImages() {
   const cookie = document.cookie.split('; ').find(row => row.startsWith('usedImages='));
@@ -54,11 +57,11 @@ const tracks = [
   { image: "images/img13.webp", mapX: 1497, mapY: 626 },
   { image: "images/img14.webp", mapX: 1526,  mapY: 572 },
   { image: "images/img15.webp", mapX: 1136, mapY: 1350 },
-  { image: "images/img16.webp", mapX: 700,  mapY: 1300, enabled: false },
-  { image: "images/img17.webp", mapX: 1150, mapY: 500,  enabled: false },
-  { image: "images/img18.webp", mapX: 1550, mapY: 650,  enabled: false },
-  { image: "images/img19.webp", mapX: 1350, mapY: 800,  enabled: false },
-  { image: "images/img20.webp", mapX: 950,  mapY: 1200, enabled: false },
+  { image: "images/img16.webp", mapX: 1197,  mapY: 1284 },
+  { image: "images/img17.webp", mapX: 1105, mapY: 1081 },
+  { image: "images/img18.webp", mapX: 1540, mapY: 1230 },
+  { image: "images/img19.webp", mapX: 1350, mapY: 800 },
+  { image: "images/img20.webp", mapX: 950,  mapY: 1200 },
   { image: "images/img21.webp", mapX: 1250, mapY: 600,  enabled: false },
   { image: "images/img22.webp", mapX: 600,  mapY: 1000, enabled: false },
   { image: "images/img23.webp", mapX: 1550, mapY: 1150, enabled: false },
@@ -75,6 +78,7 @@ const tracks = [
   const MAX_ROUNDS = 5;
   let gameSeed, shuffledTracks, currentTrack;
   let score = 0, round = 0, pendingGuess = null;
+  canGuess = true;
 
   const menu = document.getElementById("menu");
   const startBtn = document.getElementById("start-btn");
@@ -138,11 +142,15 @@ const tracks = [
     loadTrack();
   };
 
-  nextBtn.onclick = () => {
+nextBtn.onclick = () => {
     round++;
-    if (round<MAX_ROUNDS) loadTrack();
-    nextBtn.style.display="none";
-  };
+    if (round >= MAX_ROUNDS) {
+        showResults();
+    } else {
+        canGuess = true;
+        loadTrack();
+    }
+};
 
   restartBtn.onclick = () => { startBtn.click(); };
 
@@ -208,6 +216,7 @@ const tracks = [
 
   // Guess click
   mapWrapper.addEventListener("click", e => {
+    if (!canGuess) return;
     const rect=mapWrapper.getBoundingClientRect(),
           cx=e.clientX-rect.left, cy=e.clientY-rect.top,
           gx = (cx/mScale) - mO.x,
@@ -223,8 +232,8 @@ const tracks = [
           dy=pendingGuess.y-currentTrack.mapY,
           dist=Math.hypot(dx,dy);
     let pts=0;
-    if(dist<=5) pts=100;
-    else if(dist<=100) pts=Math.round(100-dist);
+    if(dist<=15) pts=200;
+    else if(dist<=200) pts=Math.round(200-dist);
     score+=pts; scoreDisplay.textContent=`Score: ${score}`;
     resultText.textContent=`Distance: ${Math.round(dist)}px | +${pts} pts`;
     markerPlayer.style.left=`${pendingGuess.x}px`;
@@ -235,6 +244,8 @@ const tracks = [
     guessLine.setAttribute("y1", currentTrack.mapY);
     guessLine.setAttribute("x2", pendingGuess.x);
     guessLine.setAttribute("y2", pendingGuess.y);
+    guessLine.style.display = "block";
+    canGuess = false;
     guessLine.style.display="block";
     confirmBtn.style.display="none";
     nextBtn.style.display=(round<MAX_ROUNDS-1?"inline-block":"none");
