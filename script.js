@@ -14,6 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function mulberry32(seed) { let a=typeof seed==='string'?Array.from(seed).reduce((a,c)=>a+c.charCodeAt(0),0):seed; return function(){a|=0;a=a+1831565813|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
   function seededShuffle(array, seed) { const r=mulberry32(seed);const c=[...array];for(let i=c.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[c[i],c[j]]=[c[j],c[i]]}return c }
 
+  // ++ MODIFIED: PanZoom class now fully supports touch events ++
   class PanZoom {
     constructor(wrapper, container, options = {}) {
       this.wrapper = wrapper; this.container = container; this.options = options;
@@ -39,31 +40,56 @@ document.addEventListener("DOMContentLoaded", () => {
       this.updateTransform();
     }
     updateTransform() { const wW=this.wrapper.clientWidth;const wH=this.wrapper.clientHeight;const cW=this.container.scrollWidth;const cH=this.container.scrollHeight;const mX=Math.max(0,cW*this.scale-wW);const mY=Math.max(0,cH*this.scale-wH);const oX=mX/this.scale;const oY=mY/this.scale;this.offset.x=Math.max(-oX,Math.min(0,this.offset.x));this.offset.y=Math.max(-oY,Math.min(0,this.offset.y));this.container.style.transform=`scale(${this.scale}) translate(${this.offset.x}px, ${this.offset.y}px)`}
-    bindEvents() { this.wrapper.addEventListener('mousedown',this.handleMouseDown.bind(this));window.addEventListener('mousemove',this.handleMouseMove.bind(this));window.addEventListener('mouseup',this.handleMouseUp.bind(this));this.wrapper.addEventListener('wheel',this.handleWheel.bind(this),{passive:false})}
-    handleWheel(e) { e.preventDefault();const oldScale=this.scale;const scaleDelta=e.deltaY>0?-0.1:0.1;this.scale=Math.min(this.maxScale,Math.max(this.minScale,this.scale+scaleDelta*this.initialScale));if(oldScale===this.scale)return;const rect=this.wrapper.getBoundingClientRect();const mouseX=e.clientX-rect.left;const mouseY=e.clientY-rect.top;this.offset.x=this.offset.x+mouseX*(1/this.scale-1/oldScale);this.offset.y=this.offset.y+mouseY*(1/this.scale-1/oldScale);this.updateTransform()}
-    handleMouseDown(e) {
+    
+    bindEvents() {
+      // Mouse events
+      this.wrapper.addEventListener('mousedown', this.handlePanStart.bind(this));
+      window.addEventListener('mousemove', this.handlePanMove.bind(this));
+      window.addEventListener('mouseup', this.handlePanEnd.bind(this));
+      // Touch events
+      this.wrapper.addEventListener('touchstart', this.handlePanStart.bind(this));
+      window.addEventListener('touchmove', this.handlePanMove.bind(this), { passive: false }); // Prevent scroll
+      window.addEventListener('touchend', this.handlePanEnd.bind(this));
+      // Wheel event
+      this.wrapper.addEventListener('wheel',this.handleWheel.bind(this),{passive:false})
+    }
+    
+    // Unified start handler for mouse and touch
+    handlePanStart(e) {
+      const point = e.touches ? e.touches[0] : e;
       this.isDown = true;
       this.didPan = false;
-      this.prevPos = { x: e.clientX, y: e.clientY };
+      this.prevPos = { x: point.clientX, y: point.clientY };
       this.wrapper.classList.add('grabbing');
     }
-    handleMouseMove(e) {
+
+    // Unified move handler for mouse and touch
+    handlePanMove(e) {
       if (!this.isDown) return;
+      if (e.touches) e.preventDefault(); // Prevent page from scrolling on touch devices
+      
       this.didPan = true;
-      this.offset.x += (e.clientX - this.prevPos.x) / this.scale;
-      this.offset.y += (e.clientY - this.prevPos.y) / this.scale;
-      this.prevPos = { x: e.clientX, y: e.clientY };
+      const point = e.touches ? e.touches[0] : e;
+      this.offset.x += (point.clientX - this.prevPos.x) / this.scale;
+      this.offset.y += (point.clientY - this.prevPos.y) / this.scale;
+      this.prevPos = { x: point.clientX, y: point.clientY };
       this.updateTransform();
     }
-    handleMouseUp(e) {
+
+    // Unified end handler for mouse and touch
+    handlePanEnd(e) {
       if (this.isDown) {
         this.isDown = false;
         this.wrapper.classList.remove('grabbing');
         if (!this.didPan && this.onUpCallback) {
-          this.onUpCallback(e);
+          // For touch, touchend doesn't have coordinates, so we use the last known position.
+          // For mouseup, e has coordinates. We can just pass it along.
+          this.onUpCallback(e.changedTouches ? this.prevPos : e);
         }
       }
     }
+    
+    handleWheel(e) { e.preventDefault();const oldScale=this.scale;const scaleDelta=e.deltaY>0?-0.1:0.1;this.scale=Math.min(this.maxScale,Math.max(this.minScale,this.scale+scaleDelta*this.initialScale));if(oldScale===this.scale)return;const rect=this.wrapper.getBoundingClientRect();const mouseX=e.clientX-rect.left;const mouseY=e.clientY-rect.top;this.offset.x=this.offset.x+mouseX*(1/this.scale-1/oldScale);this.offset.y=this.offset.y+mouseY*(1/this.scale-1/oldScale);this.updateTransform()}
   }
 
   class Game {
@@ -71,9 +97,7 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements = elements;
       this.trackPanZoom = new PanZoom(elements.trackWrapper, elements.trackContainer);
       this.mapPanZoom = new PanZoom(elements.mapWrapper, elements.mapContainer, { fit: true, maxZoom: 8, onUp: (e) => this.handleMapClick(e) });
-      
-      // ++ NEW: Populate practice selector and set initial state ++
-      this.populatePracticeSelector();
+      this.populatePracticeGrid();
       this.bindEvents();
       this.updateStatusText();
       this.displayLeaderboard();
@@ -86,25 +110,41 @@ document.addEventListener("DOMContentLoaded", () => {
       this.roundTimer = null;
       this.timeLeft = 0;
     }
-    // ++ NEW: Method to populate the practice track dropdown ++
-    populatePracticeSelector() {
+    
+    populatePracticeGrid() {
+      const grid = this.elements.practiceGrid;
+      grid.innerHTML = '';
       const enabledTracks = TRACKS_DATA.filter(t => t.enabled !== false);
+
       enabledTracks.forEach(track => {
-        const option = document.createElement('option');
-        option.value = track.image;
-        // Create a user-friendly name from the image path
+        const card = document.createElement('div');
+        card.className = 'practice-card';
+        
+        const img = document.createElement('img');
+        img.src = track.image;
+        img.alt = "Image preview";
+        img.loading = 'lazy';
+
+        const p = document.createElement('p');
         const trackName = track.image.split('/').pop().replace('.webp', '').replace(/_/g, ' ');
-        option.textContent = trackName.charAt(0).toUpperCase() + trackName.slice(1);
-        this.elements.practiceTrackSelector.appendChild(option);
+        p.textContent = trackName.charAt(0).toUpperCase() + trackName.slice(1);
+
+        card.appendChild(img);
+        card.appendChild(p);
+        
+        card.addEventListener('click', () => this.startPracticeRound(track));
+        
+        grid.appendChild(card);
       });
     }
+
     transformX(x) {
         if (this.isMirrorMode) {
             return (MAP_WIDTH - 1) - x;
         }
         return x;
     }
-    updateStatusText() { const totalEnabled = TRACKS_DATA.filter(t => t.enabled !== false).length; const usedCount = getUsedImages().length; this.elements.statusText.textContent = `You have seen ${usedCount} of ${totalEnabled} tracks.`; }
+    updateStatusText() { const totalEnabled = TRACKS_DATA.filter(t => t.enabled !== false).length; const usedCount = getUsedImages().length; this.elements.statusText.textContent = `You have seen ${usedCount} of ${totalEnabled} images.`; }
     displayLeaderboard() {
       const scores = getLeaderboard();
       const list = this.elements.leaderboardList;
@@ -126,32 +166,18 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.modalPlayAgainBtn.addEventListener('click', () => { this.elements.endGameModal.hidden = true; this.start(); });
       this.elements.modalBackToMenuBtn.addEventListener('click', () => { this.elements.endGameModal.hidden = true; this.hideGameAndShowMenu(); });
       this.elements.saveScoreBtn.addEventListener('click', () => this.saveHighScore());
-      // ++ NEW: Bind the practice button ++
-      this.elements.startPracticeBtn.addEventListener('click', () => this.startPracticeRound());
     }
-    // ++ NEW: Method to start a single practice round ++
-    startPracticeRound() {
-      const selectedTrackImage = this.elements.practiceTrackSelector.value;
-      if (!selectedTrackImage) {
-        alert("Please select a track to practice.");
-        return;
-      }
-
-      const foundTrack = TRACKS_DATA.find(t => t.image === selectedTrackImage);
-      if (!foundTrack) {
-        alert("Could not find the selected track data.");
-        return;
-      }
+    
+    startPracticeRound(track) {
+      if (!track) return;
       
       this.isPracticeMode = true;
       this.isMirrorMode = this.elements.mirrorModeCheckbox.checked;
       this.isTimerEnabled = !this.elements.unlimitedTimeCheckbox.checked;
       this.timerDuration = parseInt(this.elements.roundTimerInput.value, 10) || 30;
-
-      this.shuffledTracks = [foundTrack]; // Game will only have this one track
+      this.shuffledTracks = [track];
       this.score = 0;
       this.round = 0;
-
       this.elements.scoreDisplay.textContent = "Score: 0";
       this.elements.menu.hidden = true;
       this.elements.gameUI.hidden = false;
@@ -159,7 +185,7 @@ document.addEventListener("DOMContentLoaded", () => {
       this.loadRound();
     }
     start() {
-      this.isPracticeMode = false; // Ensure this is false for a normal game
+      this.isPracticeMode = false;
       this.isTimerEnabled = !this.elements.unlimitedTimeCheckbox.checked;
       const duration = parseInt(this.elements.roundTimerInput.value, 10);
       this.timerDuration = !isNaN(duration) && duration >= 5 ? duration : 30;
@@ -172,14 +198,15 @@ document.addEventListener("DOMContentLoaded", () => {
       const enabledTracks = TRACKS_DATA.filter(t => t.enabled !== false);
       let availableTracks = isSeededGame ? enabledTracks : enabledTracks.filter(track => !getUsedImages().includes(track.image));
       if (!isSeededGame && availableTracks.length < MAX_ROUNDS) {
-        if (getUsedImages().length > 0) alert("Not enough new tracks. Resetting the cycle for you!");
+        if (getUsedImages().length > 0) alert("Not enough new images. Resetting the cycle for you!");
         clearUsedImages(); this.updateStatusText(); availableTracks = enabledTracks;
       }
-      if (availableTracks.length === 0) { alert("Error: No tracks are available to play."); return; }
+      if (availableTracks.length === 0) { alert("Error: No images are available to play."); return; }
       this.shuffledTracks = seededShuffle(availableTracks, this.gameSeed).slice(0, MAX_ROUNDS);
       this.score = 0; this.round = 0;
       this.elements.scoreDisplay.textContent = "Score: 0";
-      this.elements.menu.hidden = true; this.elements.gameUI.hidden = false;
+      this.elements.menu.hidden = true;
+      this.elements.gameUI.hidden = false;
       this.elements.mapImage.style.transform = this.isMirrorMode ? 'scaleX(-1)' : 'none';
       this.loadRound();
     }
@@ -196,11 +223,10 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.confirmBtn.hidden = true;
       this.elements.nextBtn.hidden = true;
       this.elements.resultText.textContent = "";
-      
-      // ++ MODIFIED: Display round count correctly for practice vs normal mode ++
       const totalRounds = this.isPracticeMode ? 1 : this.shuffledTracks.length;
       this.elements.roundDisplay.textContent = `Round ${this.round + 1} / ${totalRounds}`;
-      
+      const credit = this.currentTrack.credit || "Crazalu";
+      this.elements.trackCredit.textContent = `Credit: ${credit}`;
       this.startRoundTimer();
     }
     
@@ -222,9 +248,10 @@ document.addEventListener("DOMContentLoaded", () => {
       clearInterval(this.roundTimer);
       this.elements.timerDisplay.classList.remove('low-time');
       if (!this.isTimerEnabled) {
-        this.elements.timerDisplay.textContent = "Time: ∞";
+        this.elements.timerDisplay.hidden = true;
         return;
       }
+      this.elements.timerDisplay.hidden = false;
       this.timeLeft = this.timerDuration;
       this.elements.timerDisplay.textContent = `Time: ${this.timeLeft}`;
       this.roundTimer = setInterval(() => {
@@ -253,8 +280,6 @@ document.addEventListener("DOMContentLoaded", () => {
         this.elements.markerAnswer.hidden = false;
         this.elements.markerGuess.hidden = true;
         this.elements.confirmBtn.hidden = true;
-
-        // ++ MODIFIED: Practice mode ends differently ++
         if (this.isPracticeMode) {
           this.elements.nextBtn.textContent = 'Back to Menu';
           this.elements.nextBtn.hidden = false;
@@ -268,7 +293,7 @@ document.addEventListener("DOMContentLoaded", () => {
     handleImageError(rerollAttempts) {
       const MAX_REROLLS = 10;
       if (rerollAttempts >= MAX_REROLLS) {
-        alert("Could not find a working track image after multiple attempts. Skipping this round.");
+        alert("Could not find a working image after multiple attempts. Skipping this round.");
         if (this.round < this.shuffledTracks.length - 1) {
           this.nextRound();
         } else {
@@ -278,7 +303,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       if (!this.seedWasModified && !this.isPracticeMode) {
         this.seedWasModified = true;
-        alert("A track image could not be found. Rerolling to a new one for this round.");
+        alert("An image could not be found. Rerolling to a new one for this round.");
       }
       const currentRoundImagePaths = this.shuffledTracks.map(t => t.image);
       const replacementTracks = TRACKS_DATA.filter(track =>
@@ -291,7 +316,7 @@ document.addEventListener("DOMContentLoaded", () => {
         this.elements.trackImage.onerror = () => this.handleImageError(rerollAttempts + 1);
         this.elements.trackImage.src = newTrack.image;
       } else {
-        alert("A track image could not be found and no replacements are available. Skipping this round.");
+        alert("An image could not be found and no replacements are available. Skipping this round.");
         if (this.round < this.shuffledTracks.length - 1) {
           this.nextRound();
         } else {
@@ -301,7 +326,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     nextRound() {
-      // ++ MODIFIED: If in practice mode, this button takes you back to the menu ++
       if (this.isPracticeMode) {
         this.hideGameAndShowMenu();
         return;
@@ -316,8 +340,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const { scale, offset } = this.mapPanZoom;
       const guessX = (e.clientX - rect.left) / scale - offset.x; const guessY = (e.clientY - rect.top) / scale - offset.y;
       this.pendingGuess = { x: guessX, y: guessY };
-      this.elements.markerGuess.style.left = `${guessX}px`; this.elements.markerGuess.style.top = `${guessY}px`;
-      this.elements.markerGuess.hidden = false; this.elements.confirmBtn.hidden = false;
+      this.elements.markerGuess.style.left = `${guessX}px`;
+      this.elements.markerGuess.style.top = `${guessY}px`;
+      this.elements.markerGuess.hidden = false;
+      this.elements.confirmBtn.hidden = false;
     }
 
     confirmGuess() {
@@ -355,8 +381,6 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.guessLine.style.display = "block";
       this.elements.markerGuess.hidden = true;
       this.elements.confirmBtn.hidden = true;
-
-      // ++ MODIFIED: Handle end-of-game logic for practice vs normal mode ++
       const isLastRound = this.round >= this.shuffledTracks.length - 1;
       if (isLastRound) {
         if (this.isPracticeMode) {
@@ -374,8 +398,8 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.gameUI.hidden = true;
       this.elements.menu.hidden = false;
       this.elements.mapImage.style.transform = 'none';
-      // ++ NEW: Reset the Next button's text when returning to menu ++
       this.elements.nextBtn.textContent = 'Next Round';
+      this.elements.timerDisplay.hidden = false;
       this.displayLeaderboard();
     }
     showFinalResults() {
@@ -404,7 +428,7 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.endGameModal.hidden = false;
     }
     isHighScore(score) {
-      if (score === 0 || this.isPracticeMode) return false; // Don't save high scores for practice
+      if (score === 0 || this.isPracticeMode) return false;
       const scores = getLeaderboard();
       const lowestScore = scores.length > 0 ? scores[scores.length - 1].score : 0;
       return score > lowestScore || scores.length < LEADERBOARD_MAX_ENTRIES;
@@ -423,9 +447,9 @@ document.addEventListener("DOMContentLoaded", () => {
         let message = `Seed "${seed}" copied to clipboard.`;
         const currentHash = generateDataHash(TRACKS_DATA);
         if (savedHash && savedHash !== currentHash) {
-          message += "\n\nWarning: The game's track data has changed since this score was set. Playing this seed may result in a different set of rounds.";
+          message += "\n\nWarning: The game's image data has changed since this score was set. Playing this seed may result in a different set of rounds.";
         } else if (!savedHash) {
-          message += "\n\nNote: If the game's track data is updated in the future, this seed may produce different rounds.";
+          message += "\n\nNote: If the game's image data is updated in the future, this seed may produce different rounds.";
         }
         if (this.seedWasModified) {
           message += "\n\nAdditionally, an image failed to load during your game and was replaced, so this seed is unique to your playthrough.";
@@ -457,9 +481,8 @@ document.addEventListener("DOMContentLoaded", () => {
     roundTimerInput: document.getElementById('round-timer-input'),
     unlimitedTimeCheckbox: document.getElementById('unlimited-time-checkbox'),
     timerDisplay: document.getElementById('timer-display'),
-    // ++ NEW: Practice mode elements ++
-    practiceTrackSelector: document.getElementById('practice-track-selector'),
-    startPracticeBtn: document.getElementById('start-practice-btn'),
+    practiceGrid: document.getElementById('practice-grid'),
+    trackCredit: document.getElementById('track-credit'),
   };
   
   new Game(elements);

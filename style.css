@@ -43,6 +43,7 @@ h2 { margin-top: 0; }
 .track-wrapper .interactive-area-container { width: 100%; }
 .map-wrapper .interactive-area-container { width: 2004px; height: 1086px; }
 #track-image, #track-map { display: block; user-select: none; pointer-events: none; width: 100%; height: auto; }
+#track-credit { position: absolute; bottom: 0; right: 0; background-color: rgba(0, 0, 0, 0.6); color: white; padding: 2px 8px; margin: 5px; border-radius: 4px; font-size: 0.8em; pointer-events: none; }
 .marker { position: absolute; width: 24px; height: 24px; transform: translate(-50%, -50%); pointer-events: none; z-index: 10; }
 .guess-line-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; overflow: visible; }
 #guess-line { stroke: var(--line-color); stroke-width: 3; stroke-dasharray: 10 5; }
@@ -82,10 +83,76 @@ input[type="text"], input[type="number"] { padding: 8px; margin: 0 10px 10px 5px
 .timer-controls .checkbox-wrapper { margin-left: 10px; }
 .checkbox-wrapper { display: inline-flex; align-items: center; gap: 5px; }
 .stats .low-time { color: #e74c3c; font-weight: bold; }
-
-/* ++ NEW: Styles for practice mode section ++ */
 hr { border: 0; height: 1px; background-color: var(--leaderboard-border); margin: 2em 0; }
 .practice-controls { display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .practice-controls h2 { margin-bottom: 0; }
-.practice-controls select { padding: 8px; border-radius: 5px; border: 1px solid #ccc; max-width: 90%; }
-.practice-controls button { margin-top: 10px; }
+.practice-controls p { margin: 0 0 10px 0; font-style: italic; color: #555; }
+#practice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 15px;
+  width: 100%;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid var(--leaderboard-border);
+  border-radius: var(--border-radius);
+}
+.practice-card {
+  display: flex;
+  flex-direction: column;
+  border: 2px solid transparent;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  overflow: hidden;
+  background-color: rgba(0,0,0,0.1);
+}
+.practice-card:hover {
+  transform: scale(1.05);
+  border-color: var(--primary-button-bg);
+}
+.practice-card img {
+  width: 100%;
+  height: 80px;
+  object-fit: cover;
+}
+.practice-card p {
+  margin: 0;
+  padding: 5px;
+  font-size: 0.8em;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-color);
+}
+
+/* ++ NEW: Media Query for Mobile Support ++ */
+@media (max-width: 800px) {
+  h1 {
+    font-size: 1.5em;
+  }
+  .menu-main, .game-main-area {
+    flex-direction: column;
+  }
+  .stats {
+    font-size: 1em;
+  }
+  .track-wrapper {
+    flex-basis: auto; /* Allow it to size based on content */
+    width: 100%;
+    margin-bottom: 10px; /* Reduce space between stacked items */
+  }
+  .map-wrapper {
+    flex-basis: auto;
+    width: 100%;
+  }
+  .btn-header {
+    position: relative; /* Make it part of the flow */
+    display: block;
+    margin: 0 auto 15px auto; /* Center it */
+    top: 0;
+    left: 0;
+  }
+}

@@ -26,9 +26,9 @@
         
         <div class="timer-controls">
           <label for="round-timer-input">Round Timer (s):</label>
-          <input type="number" id="round-timer-input" value="30" min="5">
+          <input type="number" id="round-timer-input" value="30" min="5" disabled>
           <div class="checkbox-wrapper">
-            <input type="checkbox" id="unlimited-time-checkbox">
+            <input type="checkbox" id="unlimited-time-checkbox" checked>
             <label for="unlimited-time-checkbox">Unlimited</label>
           </div>
         </div>
@@ -49,14 +49,11 @@
         
         <hr>
         
-        <!-- ++ NEW: Practice Mode Section ++ -->
         <div class="practice-controls">
           <h2>Practice Mode</h2>
-          <label for="practice-track-selector">Select a Track:</label>
-          <select id="practice-track-selector">
-            <option value="">-- Please choose a track --</option>
-          </select>
-          <button id="start-practice-btn">Start Practice</button>
+          <!-- ++ MODIFIED: "track" changed to "image" ++ -->
+          <p>Click an image to start</p>
+          <div id="practice-grid"></div>
         </div>
         
       </div>
@@ -85,8 +82,10 @@
     <div class="game-main-area">
       <div id="track-wrapper" class="interactive-area track-wrapper">
         <div id="track-container" class="interactive-area-container">
-          <img id="track-image" src="" alt="Track Image to guess">
+          <!-- ++ MODIFIED: "Track Image" changed to "Image" ++ -->
+          <img id="track-image" src="" alt="Image to guess">
         </div>
+        <p id="track-credit"></p>
       </div>
       
       <div id="map-wrapper" class="interactive-area map-wrapper">
