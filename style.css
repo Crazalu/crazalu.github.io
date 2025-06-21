@@ -63,7 +63,8 @@ h1 { margin-bottom: 10px; }
 .guess-line {
   position: absolute;
   top: 0; left: 0;
-  width: 1900px; height: 1661px;
+  width: 1900px; 
+  height: 1661px;
   pointer-events: none;
   z-index: 5;
 }
