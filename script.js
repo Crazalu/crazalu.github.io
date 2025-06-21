@@ -14,11 +14,12 @@ document.addEventListener("DOMContentLoaded", () => {
   function mulberry32(seed) { let a=typeof seed==='string'?Array.from(seed).reduce((a,c)=>a+c.charCodeAt(0),0):seed; return function(){a|=0;a=a+1831565813|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
   function seededShuffle(array, seed) { const r=mulberry32(seed);const c=[...array];for(let i=c.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[c[i],c[j]]=[c[j],c[i]]}return c }
 
-  // ++ MODIFIED: PanZoom class now fully supports touch events correctly ++
+  // ++ MODIFIED: Complete refactor of PanZoom for robust touch and pinch support ++
   class PanZoom {
     constructor(wrapper, container, options = {}) {
       this.wrapper = wrapper; this.container = container; this.options = options;
-      this.offset = { x: 0, y: 0 }; this.scale = 1; this.isDown = false; this.didPan = false; this.prevPos = { x: 0, y: 0 };
+      this.offset = { x: 0, y: 0 }; this.scale = 1; this.isDown = false; this.didPan = false;
+      this.prevPos = { x: 0, y: 0 }; this.prevPinchDist = null;
       this.onUpCallback = options.onUp || null;
       this.bindEvents();
       this.wrapper.style.cursor = 'grab';
@@ -39,49 +40,86 @@ document.addEventListener("DOMContentLoaded", () => {
       this.minScale = this.initialScale; this.maxScale = this.initialScale * (this.options.maxZoom || 4);
       this.updateTransform();
     }
-    updateTransform() { const wW=this.wrapper.clientWidth;const wH=this.wrapper.clientHeight;const cW=this.container.scrollWidth;const cH=this.container.scrollHeight;const mX=Math.max(0,cW*this.scale-wW);const mY=Math.max(0,cH*this.scale-wH);const oX=mX/this.scale;const oY=mY/this.scale;this.offset.x=Math.max(-oX,Math.min(0,this.offset.x));this.offset.y=Math.max(-oY,Math.min(0,this.offset.y));this.container.style.transform=`scale(${this.scale}) translate(${this.offset.x}px, ${this.offset.y}px)`}
-    
-    bindEvents() {
-      this.wrapper.addEventListener('mousedown', this.handlePanStart.bind(this));
-      window.addEventListener('mousemove', this.handlePanMove.bind(this));
-      window.addEventListener('mouseup', this.handlePanEnd.bind(this));
-      this.wrapper.addEventListener('touchstart', this.handlePanStart.bind(this), { passive: true });
-      this.wrapper.addEventListener('touchmove', this.handlePanMove.bind(this), { passive: false });
-      window.addEventListener('touchend', this.handlePanEnd.bind(this));
-      this.wrapper.addEventListener('wheel',this.handleWheel.bind(this),{passive:false})
+    updateTransform() {
+      const wW = this.wrapper.clientWidth; const wH = this.wrapper.clientHeight;
+      const cW = this.container.scrollWidth; const cH = this.container.scrollHeight;
+      const mX = Math.max(0, cW * this.scale - wW); const mY = Math.max(0, cH * this.scale - wH);
+      const oX = mX / this.scale; const oY = mY / this.scale;
+      this.offset.x = Math.max(-oX, Math.min(0, this.offset.x));
+      this.offset.y = Math.max(-oY, Math.min(0, this.offset.y));
+      this.container.style.transform = `scale(${this.scale}) translate(${this.offset.x}px, ${this.offset.y}px)`;
     }
-    
-    handlePanStart(e) {
-      const point = e.touches ? e.touches[0] : e;
+    bindEvents() {
+      this.wrapper.addEventListener('mousedown', this.handleStart.bind(this));
+      window.addEventListener('mousemove', this.handleMove.bind(this));
+      window.addEventListener('mouseup', this.handleEnd.bind(this));
+      this.wrapper.addEventListener('touchstart', this.handleStart.bind(this), { passive: true });
+      this.wrapper.addEventListener('touchmove', this.handleMove.bind(this), { passive: false });
+      window.addEventListener('touchend', this.handleEnd.bind(this));
+      this.wrapper.addEventListener('wheel', this.handleWheel.bind(this), { passive: false });
+    }
+    handleStart(e) {
       this.isDown = true;
       this.didPan = false;
+      const point = e.touches ? e.touches[0] : e;
       this.prevPos = { x: point.clientX, y: point.clientY };
       this.wrapper.classList.add('grabbing');
-    }
-
-    handlePanMove(e) {
-      if (!this.isDown) return;
-      if (e.touches) e.preventDefault();
-      this.didPan = true;
-      const point = e.touches ? e.touches[0] : e;
-      this.offset.x += (point.clientX - this.prevPos.x) / this.scale;
-      this.offset.y += (point.clientY - this.prevPos.y) / this.scale;
-      this.prevPos = { x: point.clientX, y: point.clientY };
-      this.updateTransform();
-    }
-
-    handlePanEnd(e) {
-      if (this.isDown) {
-        this.isDown = false;
-        this.wrapper.classList.remove('grabbing');
-        // ++ FIXED: Create a standardized object for the callback to fix tap-to-guess on mobile ++
-        if (!this.didPan && this.onUpCallback) {
-          this.onUpCallback({ clientX: this.prevPos.x, clientY: this.prevPos.y });
-        }
+      if (e.touches && e.touches.length === 2) {
+        this.prevPinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
       }
     }
-    
-    handleWheel(e) { e.preventDefault();const oldScale=this.scale;const scaleDelta=e.deltaY>0?-0.1:0.1;this.scale=Math.min(this.maxScale,Math.max(this.minScale,this.scale+scaleDelta*this.initialScale));if(oldScale===this.scale)return;const rect=this.wrapper.getBoundingClientRect();const mouseX=e.clientX-rect.left;const mouseY=e.clientY-rect.top;this.offset.x=this.offset.x+mouseX*(1/this.scale-1/oldScale);this.offset.y=this.offset.y+mouseY*(1/this.scale-1/oldScale);this.updateTransform()}
+    handleMove(e) {
+      if (!this.isDown) return;
+      if (e.touches) e.preventDefault();
+      
+      if (e.touches && e.touches.length === 2 && this.prevPinchDist) {
+        // Pinch-to-zoom logic
+        const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        const scaleChange = dist / this.prevPinchDist;
+        const oldScale = this.scale;
+        this.scale = Math.max(this.minScale, Math.min(this.maxScale, oldScale * scaleChange));
+        
+        const rect = this.wrapper.getBoundingClientRect();
+        const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+        const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+
+        this.offset.x += (midX / this.scale) - (midX / oldScale);
+        this.offset.y += (midY / this.scale) - (midY / oldScale);
+
+        this.prevPinchDist = dist;
+      } else {
+        // Pan logic
+        const point = e.touches ? e.touches[0] : e;
+        this.didPan = true;
+        this.offset.x += (point.clientX - this.prevPos.x) / this.scale;
+        this.offset.y += (point.clientY - this.prevPos.y) / this.scale;
+        this.prevPos = { x: point.clientX, y: point.clientY };
+      }
+      this.updateTransform();
+    }
+    handleEnd(e) {
+      if (!this.isDown) return;
+      this.isDown = false;
+      this.wrapper.classList.remove('grabbing');
+      this.prevPinchDist = null;
+      if (!this.didPan && this.onUpCallback) {
+        const point = e.changedTouches ? e.changedTouches[0] : e;
+        this.onUpCallback(point);
+      }
+    }
+    handleWheel(e) {
+      e.preventDefault();
+      const oldScale = this.scale;
+      const scaleDelta = e.deltaY > 0 ? -0.1 : 0.1;
+      this.scale = Math.max(this.minScale, Math.min(this.maxScale, this.scale + scaleDelta * this.initialScale));
+      if (oldScale === this.scale) return;
+      const rect = this.wrapper.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      this.offset.x += (mouseX / this.scale) - (mouseX / oldScale);
+      this.offset.y += (mouseY / this.scale) - (mouseY / oldScale);
+      this.updateTransform();
+    }
   }
 
   // The rest of the Game class and other functions remain the same
