@@ -24,19 +24,19 @@
     </div>
 
 <div class="map-wrapper" id="map-wrapper">
-  <!-- Add this SVG just before the map image -->
-  <svg id="guess-line" class="guess-line">
-    <line x1="0" y1="0" x2="0" y2="0" />
-  </svg>
-
   <div class="map-container" id="map-container">
     <img id="track-map" src="map/mk_map.webp" alt="Track Map">
-    <img id="marker-guess" class="marker" src="images/marker.png" alt="Guess">
-    <img id="marker-player" class="marker" src="images/marker.png" alt="Player">
-    <img id="marker-answer" class="marker" src="images/marker.png" alt="Answer">
+
+    <!-- Move the guess-line SVG here -->
+    <svg id="guess-line" class="guess-line">
+      <line x1="0" y1="0" x2="0" y2="0" />
+    </svg>
+
+    <img id="marker-guess" class="marker" src="images/marker.png" alt="Guess" />
+    <img id="marker-player" class="marker" src="images/marker.png" alt="Player" />
+    <img id="marker-answer" class="marker" src="images/star.png" alt="Answer" />
   </div>
 </div>
-
     <button id="confirm-btn" style="display:none;">Confirm Guess</button>
     <p id="result"></p>
     <button id="next-btn" style="display:none;">Next Round</button>
