@@ -91,7 +91,23 @@ body.menu-active #menu {
 .stats p { margin: 0; }
 .interactive-area { width: 100%; overflow: hidden; border: 3px solid var(--border-color); border-radius: var(--border-radius); margin: 0; position: relative; background-color: #000; }
 .game-main-area { display: flex; gap: 20px; align-items: flex-start; }
-.track-wrapper { flex: 1; cursor: grab; transition: opacity 0.5s ease; aspect-ratio: 3 / 2; }
+
+/* ADDED: Style for the panel containing the image and its name */
+.image-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ADDED: Style for the track name display */
+#track-name-display {
+  margin: 10px 0 0 0;
+  font-size: 1.2em;
+  font-weight: 500;
+  min-height: 1.5em; /* Prevents layout jump when text is empty */
+}
+
+.track-wrapper { flex-shrink: 0; /* Prevents shrinking inside the flex panel */ cursor: grab; transition: opacity 0.5s ease; aspect-ratio: 3 / 2; }
 .track-wrapper.faded-out { opacity: 0; pointer-events: none; }
 .map-wrapper { flex: 1; cursor: crosshair; background-color: var(--map-bg-color); aspect-ratio: 2004 / 1086; }
 .interactive-area.grabbing { cursor: grabbing; }
@@ -102,12 +118,14 @@ body.menu-active #menu {
   width: 100%;
   height: 100%;
 }
+
+/* MODIFIED: Added transform-origin to fix map positioning */
 #map-container {
   width: 2004px;
   height: 1086px;
-  transform-origin: 0 0; /*  <-- ADD THIS LINE */
-
+  transform-origin: 0 0;
 }
+
 #track-image, #track-map { display: block; user-select: none; pointer-events: none; width: 100%; height: 100%; object-fit: cover; }
 #track-credit { position: absolute; bottom: 0; right: 0; background-color: rgba(0, 0, 0, 0.6); color: white; padding: 2px 8px; margin: 5px; border-radius: 4px; font-size: 0.8em; pointer-events: none; }
 .marker { position: absolute; width: 24px; height: 24px; transform: translate(-50%, -50%); pointer-events: none; z-index: 10; }
@@ -213,9 +231,14 @@ hr { border: 0; height: 1px; background-color: var(--leaderboard-border); margin
 @media (max-width: 800px) {
   .logo-image { max-width: 90%; }
   .menu-main, .game-main-area { flex-direction: column; }
-  .stats { font-size: 1em; }
-  .track-wrapper { flex-basis: auto; width: 100%; margin-bottom: 10px; }
+  /* MODIFIED: The new panel will stack correctly with this */
+  .image-panel {
+    width: 100%;
+    margin-bottom: 10px;
+  }
+  .track-wrapper { flex-basis: auto; width: 100%; margin-bottom: 0; } /* Removed margin-bottom */
   .map-wrapper { flex-basis: auto; width: 100%; }
+  .stats { font-size: 1em; }
   .btn-header { position: relative; display: block; margin: 0 auto 15px auto; top: 0; left: 0; }
   .controls { position: relative; background: none; transform: none; left: auto; bottom: auto; }
   #practice-grid {

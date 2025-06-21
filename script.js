@@ -325,6 +325,8 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.roundDisplay.textContent = `Round ${this.round + 1} / ${totalRounds}`;
       const credit = this.currentTrack.credit || "Crazalu";
       this.elements.trackCredit.textContent = `Credit: ${credit}`;
+      // ADDED: Set the track name display text
+      this.elements.trackNameDisplay.textContent = this.currentTrack.name || "Unknown Location";
       this.startRoundTimer();
       this.startImageFadeTimer();
     }
@@ -379,9 +381,15 @@ document.addEventListener("DOMContentLoaded", () => {
         this.elements.resultText.textContent = "Time's up! +0 pts";
         const answerX = this.transformX(this.currentTrack.mapX);
         const answerY = this.currentTrack.mapY;
-        this.elements.markerAnswer.style.left = `${answerX}px`;
-        this.elements.markerAnswer.style.top = `${answerY}px`;
+        
+        // MODIFIED: Calculate visual position for the answer marker
+        const { scale, offset } = this.mapPanZoom;
+        const answerMarkerX = (answerX + offset.x) * scale;
+        const answerMarkerY = (answerY + offset.y) * scale;
+        this.elements.markerAnswer.style.left = `${answerMarkerX}px`;
+        this.elements.markerAnswer.style.top = `${answerMarkerY}px`;
         this.elements.markerAnswer.hidden = false;
+
         this.elements.markerGuess.hidden = true;
         this.elements.confirmBtn.hidden = true;
         const isLastRound = this.round >= this.shuffledTracks.length - 1;
@@ -428,18 +436,26 @@ document.addEventListener("DOMContentLoaded", () => {
       this.loadRound();
     }
     
+    // MODIFIED: This function now correctly places the marker visually.
     handleMapClick(e) {
       if (!this.canGuess) return;
       const rect = this.elements.mapWrapper.getBoundingClientRect();
       const { scale, offset } = this.mapPanZoom;
-      const guessX = (e.clientX - rect.left) / scale - offset.x; const guessY = (e.clientY - rect.top) / scale - offset.y;
+
+      const guessX = (e.clientX - rect.left) / scale - offset.x;
+      const guessY = (e.clientY - rect.top) / scale - offset.y;
       this.pendingGuess = { x: guessX, y: guessY };
-      this.elements.markerGuess.style.left = `${guessX}px`;
-      this.elements.markerGuess.style.top = `${guessY}px`;
+
+      const markerX = (guessX + offset.x) * scale;
+      const markerY = (guessY + offset.y) * scale;
+      
+      this.elements.markerGuess.style.left = `${markerX}px`;
+      this.elements.markerGuess.style.top = `${markerY}px`;
       this.elements.markerGuess.hidden = false;
       this.elements.confirmBtn.hidden = false;
     }
 
+    // MODIFIED: This function now correctly places all markers and the line.
     confirmGuess() {
       if (!this.pendingGuess || !this.canGuess) return;
       this.stopAllTimers();
@@ -448,13 +464,16 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
       this.canGuess = false;
+      
       const answerX = this.transformX(this.currentTrack.mapX);
       const answerY = this.currentTrack.mapY;
+      
       const dx = this.pendingGuess.x - answerX;
       const dy = this.pendingGuess.y - answerY;
       const distance = Math.hypot(dx, dy); let points = 0;
       if (distance <= 15) points = 200; else if (distance <= 200) points = Math.round(200 - distance);
       this.score += points;
+      
       this.elements.scoreDisplay.textContent = `Score: ${this.score}`;
       this.elements.resultText.textContent = `Distance: ${Math.round(distance)}px | +${points} pts`;
       
@@ -462,19 +481,28 @@ document.addEventListener("DOMContentLoaded", () => {
         setUsedImages([...new Set([...getUsedImages(), this.currentTrack.image])]);
       }
       
-      this.elements.markerPlayer.style.left = `${this.pendingGuess.x}px`;
-      this.elements.markerPlayer.style.top = `${this.pendingGuess.y}px`;
-      this.elements.markerAnswer.style.left = `${answerX}px`;
-      this.elements.markerAnswer.style.top = `${answerY}px`;
+      const { scale, offset } = this.mapPanZoom;
+      const playerMarkerX = (this.pendingGuess.x + offset.x) * scale;
+      const playerMarkerY = (this.pendingGuess.y + offset.y) * scale;
+      const answerMarkerX = (answerX + offset.x) * scale;
+      const answerMarkerY = (answerY + offset.y) * scale;
+
+      this.elements.markerPlayer.style.left = `${playerMarkerX}px`;
+      this.elements.markerPlayer.style.top = `${playerMarkerY}px`;
+      this.elements.markerAnswer.style.left = `${answerMarkerX}px`;
+      this.elements.markerAnswer.style.top = `${answerMarkerY}px`;
       this.elements.markerPlayer.hidden = false;
       this.elements.markerAnswer.hidden = false;
-      this.elements.guessLine.setAttribute("x1", answerX);
-      this.elements.guessLine.setAttribute("y1", answerY);
-      this.elements.guessLine.setAttribute("x2", this.pendingGuess.x);
-      this.elements.guessLine.setAttribute("y2", this.pendingGuess.y);
+
+      this.elements.guessLine.setAttribute("x1", answerMarkerX);
+      this.elements.guessLine.setAttribute("y1", answerMarkerY);
+      this.elements.guessLine.setAttribute("x2", playerMarkerX);
+      this.elements.guessLine.setAttribute("y2", playerMarkerY);
       this.elements.guessLine.style.display = "block";
+      
       this.elements.markerGuess.hidden = true;
       this.elements.confirmBtn.hidden = true;
+      
       const isLastRound = this.round >= this.shuffledTracks.length - 1;
       if (isLastRound) {
         if (this.isPracticeMode) {
@@ -502,17 +530,22 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.mapImage.style.transform = 'none';
       this.elements.nextBtn.textContent = 'Next Round';
       this.elements.timerDisplay.hidden = false;
+      // ADDED: Clear the track name when returning to menu
+      this.elements.trackNameDisplay.textContent = "";
       this.displayLeaderboard();
       this.populatePracticeGrid();
     }
     showFinalResults() {
       const maxScore = 200 * this.shuffledTracks.length;
       this.elements.modalFinalScore.textContent = `${this.score} / ${maxScore}`;
+      
+      // MODIFIED: Bug fix - reset the save score form every time
+      this.elements.playerNameInput.value = '';
+      this.elements.saveScoreBtn.disabled = false;
+      this.elements.saveScoreBtn.textContent = "Save Score";
+      
       if (this.isHighScore(this.score)) {
         this.elements.saveScoreForm.hidden = false;
-        this.elements.playerNameInput.value = '';
-        this.elements.saveScoreBtn.disabled = false;
-        this.elements.saveScoreBtn.textContent = "Save Score";
       } else {
         this.elements.saveScoreForm.hidden = true;
       }
@@ -573,6 +606,8 @@ document.addEventListener("DOMContentLoaded", () => {
     trackWrapper: document.getElementById("track-wrapper"), 
     trackContainer: document.getElementById("track-container"),
     trackImage: document.getElementById("track-image"), 
+    // ADDED: The new element for the track name
+    trackNameDisplay: document.getElementById("track-name-display"),
     confirmBtn: document.getElementById("confirm-btn"), 
     nextBtn: document.getElementById("next-btn"),
     roundDisplay: document.getElementById("round-display"), 
