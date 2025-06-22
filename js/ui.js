@@ -156,7 +156,7 @@ function initializeUI(elements) {
           elements.randMirrorSite.checked = false;
           elements.randInvertedSite.checked = false;
 
-          elements.randPerGame.checked = true;
+          elements.randPerRound.checked = true;
 
           // Dispatch change events to update UI state
           [

@@ -801,6 +801,7 @@ class Game {
       this.elements.revealFragmentBtn.hidden = true;
       
       this.displayLeaderboard();
+      this.updateStatusText();
     }
 
     showFinalResults() {
