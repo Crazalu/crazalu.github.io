@@ -144,12 +144,14 @@ button:hover { background-color: #0056b3; }
 .btn-secondary { background-color: var(--secondary-button-bg); }
 .btn-secondary:hover { background-color: #5a6268; }
 .btn-header { position: absolute; top: 0; left: 0; padding: 5px 10px; font-size: 0.9em; }
+.btn-small { padding: 4px 10px; font-size: 0.8em; }
+
 input[type="text"], input[type="number"], select { padding: 8px; margin: 0 5px 10px 5px; border: 1px solid #ccc; border-radius: 5px; }
 .menu-footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid var(--leaderboard-border); }
 #used-images-status { margin: 0 0 10px 0; color: #555; font-style: italic; }
 [hidden] { display: none !important; }
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-.modal-content { background-color: var(--modal-bg); padding: 2em; border-radius: var(--border-radius); text-align: center; width: 90%; max-width: 400px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+.modal-content { background-color: var(--modal-bg); padding: 2em; border-radius: var(--border-radius); text-align: center; width: 90%; max-width: 500px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
 .modal-score { font-size: 2em; font-weight: bold; margin: 0.5em 0 1.5em 0; color: var(--primary-button-bg); }
 #save-score-form { margin-bottom: 1.5em; }
 #save-score-form p { margin-top: 0; }
@@ -168,11 +170,8 @@ input[type="text"], input[type="number"], select { padding: 8px; margin: 0 5px 1
 .theme-controls { margin: 20px 0; display: flex; align-items: center; justify-content: center; gap: 10px; }
 #theme-selector { padding: 8px; border-radius: 5px; border: 1px solid #ccc; }
 #custom-bg-color { border: none; background: none; width: 40px; height: 35px; cursor: pointer; padding: 0; border-radius: 5px; }
-.timer-controls { display: flex; align-items: center; justify-content: center; gap: 5px; margin: 10px 0; }
-.timer-controls input[type="number"] { width: 60px; text-align: center; }
-.timer-controls .checkbox-wrapper { margin-left: 10px; }
+.timer-controls { display: flex; align-items: center; justify-content: center; gap: 5px; margin: 10px 0; flex-wrap: wrap; }
 .checkbox-wrapper { display: inline-flex; align-items: center; gap: 5px; }
-/* ++ ADDED: Style for "crossed-out" disabled checkboxes ++ */
 .checkbox-wrapper input[type="checkbox"]:disabled + label {
     text-decoration: line-through;
     opacity: 0.6;
@@ -180,6 +179,9 @@ input[type="text"], input[type="number"], select { padding: 8px; margin: 0 5px 1
 }
 
 .stats .low-time { color: #e74c3c; font-weight: bold; }
+/* ++ ADDED: Style for the new fade timer display ++ */
+#fade-timer-display { color: #2980b9; }
+
 hr { border: 0; height: 1px; background-color: var(--leaderboard-border); margin: 2em 0; }
 .practice-controls { display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .practice-controls h2 { margin-bottom: 0; }
@@ -264,7 +266,6 @@ hr { border: 0; height: 1px; background-color: var(--leaderboard-border); margin
     align-items: center;
     gap: 5px;
 }
-/* ++ ADDED: Styling for the new checkbox container ++ */
 .mode-options-group {
     display: flex;
     justify-content: center;
@@ -277,6 +278,40 @@ hr { border: 0; height: 1px; background-color: var(--leaderboard-border); margin
 }
 .mode-selector-group select {
     min-width: 150px;
+}
+
+#randomizer-modal .modal-content {
+    text-align: left;
+}
+.randomizer-section {
+    padding: 15px;
+    margin-bottom: 15px;
+    border: 1px solid var(--leaderboard-border);
+    border-radius: var(--border-radius);
+}
+.randomizer-section h3 {
+    margin-top: 0;
+    text-align: center;
+}
+.randomizer-section .checkbox-wrapper {
+    margin-right: 15px;
+}
+.randomizer-section.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+.timer-rand-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+.timer-rand-controls .range-inputs input {
+    width: 60px;
+}
+.modal-actions {
+  text-align: center;
 }
 
 @media (max-width: 800px) {

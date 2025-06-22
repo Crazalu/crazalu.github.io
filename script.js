@@ -11,10 +11,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const MAGNIFICATION_LEVEL = 2.5;
   
   const MODE_KEY = 'marioKartGeoGuessr_mode';
-  // ++ REPLACED: New keys for individual checkboxes ++
   const MODE_OPTION_TRACK_KEY = 'marioKartGeoGuessr_modeOption_track';
   const MODE_OPTION_MAP_KEY = 'marioKartGeoGuessr_modeOption_map';
   const MODE_OPTION_SITE_KEY = 'marioKartGeoGuessr_modeOption_site';
+  const SHOW_FADE_TIMER_KEY = 'marioKartGeoGuessr_showFadeTimer'; // ++ ADDED: Key for new setting
 
   const getUsedImages = () => JSON.parse(localStorage.getItem(USED_IMAGES_KEY)) || [];
   const setUsedImages = (list) => localStorage.setItem(USED_IMAGES_KEY, JSON.stringify(list));
@@ -205,6 +205,12 @@ document.addEventListener("DOMContentLoaded", () => {
       this.confirmedGuess = null;
 
       this.gameMode = 'normal';
+      this.isMirrorTrack = false;
+      this.isMirrorMap = false;
+      this.isMirrorSite = false;
+      this.isInvertedTrack = false;
+      this.isInvertedMap = false;
+      this.isInvertedSite = false;
 
       this.isPracticeMode = false;
       this.currentImageLoadedSuccessfully = false;
@@ -216,6 +222,7 @@ document.addEventListener("DOMContentLoaded", () => {
       this.isFadeTimerEnabled = false;
       this.fadeTimerDuration = 10;
       this.imageFadeTimer = null;
+      this.fadeDisplayInterval = null; // ++ ADDED: Interval for fade timer display
     }
 
     updateMarkerPositions() {
@@ -240,8 +247,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (!this.canGuess) {
           let answerX = this.currentTrack.mapX;
-          // ++ MODIFIED: Read from the map checkbox
-          if (this.gameMode === 'mirror' && this.elements.modeOptionMap.checked) {
+          if (this.isMirrorMap) {
               answerX = (MAP_WIDTH - 1) - answerX;
           }
           const answerLogicalPos = {
@@ -351,6 +357,14 @@ document.addEventListener("DOMContentLoaded", () => {
       window.addEventListener('mouseup', () => {
           this.isImageInteraction = false;
       });
+
+      this.elements.randomizerBtn.addEventListener('click', () => { this.elements.randomizerModal.hidden = false; });
+      this.elements.cancelRandomBtn.addEventListener('click', () => { this.elements.randomizerModal.hidden = true; });
+      this.elements.startRandomBtn.addEventListener('click', () => this.startRandomizedGame());
+      this.elements.resetModeBtn.addEventListener('click', () => {
+        this.elements.modeSelector.value = "normal";
+        this.elements.modeSelector.dispatchEvent(new Event('change'));
+      });
     }
 
     handleMagnifierEnter(e) {
@@ -410,7 +424,118 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       this.setupGameSettings();
       this.isPracticeMode = true;
-      this.shuffledTracks = [track];
+      this._startGameWithSettings({ isPractice: true, practiceTrack: track });
+    }
+    
+    start() {
+      if (this.elements.modeSelector.value === "") {
+        alert("Please select a game mode first!");
+        return;
+      }
+      this.setupGameSettings();
+      this.isPracticeMode = false;
+      this._startGameWithSettings({ isPractice: false });
+    }
+    
+    startRandomizedGame() {
+      const { 
+        randModeMirror, randModeInverted,
+        randMirrorTrack, randMirrorMap, randMirrorSite,
+        randInvertedTrack, randInvertedMap, randInvertedSite,
+        randTimerEnable, randTimerMin, randTimerMax,
+        randFadeEnable, randFadeMin, randFadeMax,
+        randomizerModal
+      } = this.elements;
+
+      // Build modifier pools for each component. A pool can contain 'normal', 'mirror', 'inverted', or 'both'.
+      const buildModifierPool = (isMirror, isMirrorChecked, isInverted, isInvertedChecked) => {
+        const pool = ['normal'];
+        if (isMirror && isMirrorChecked) pool.push('mirror');
+        if (isInverted && isInvertedChecked) pool.push('inverted');
+        if (isMirror && isMirrorChecked && isInverted && isInvertedChecked) pool.push('both'); // Allow combined effect
+        return pool;
+      }
+
+      const trackModifiers = buildModifierPool(randModeMirror.checked, randMirrorTrack.checked, randModeInverted.checked, randInvertedTrack.checked);
+      const mapModifiers = buildModifierPool(randModeMirror.checked, randMirrorMap.checked, randModeInverted.checked, randInvertedMap.checked);
+      const siteModifiers = buildModifierPool(randModeMirror.checked, randMirrorSite.checked, randModeInverted.checked, randInvertedSite.checked);
+
+      const randomTrack = trackModifiers[Math.floor(Math.random() * trackModifiers.length)];
+      const randomMap = mapModifiers[Math.floor(Math.random() * mapModifiers.length)];
+      const randomSite = siteModifiers[Math.floor(Math.random() * siteModifiers.length)];
+
+      this.isMirrorTrack = randomTrack === 'mirror' || randomTrack === 'both';
+      this.isInvertedTrack = randomTrack === 'inverted' || randomTrack === 'both';
+      this.isMirrorMap = randomMap === 'mirror' || randomMap === 'both';
+      this.isInvertedMap = randomMap === 'inverted' || randomMap === 'both';
+      this.isMirrorSite = randomSite === 'mirror' || randomSite === 'both';
+      this.isInvertedSite = randomSite === 'inverted' || randomSite === 'both';
+      
+      if (randTimerEnable.checked) {
+        this.isTimerEnabled = true;
+        const min = parseInt(randTimerMin.value, 10);
+        const max = parseInt(randTimerMax.value, 10);
+        this.timerDuration = Math.floor(Math.random() * (max - min + 1)) + min;
+      } else {
+        this.isTimerEnabled = false;
+      }
+
+      if (randFadeEnable.checked) {
+        this.isFadeTimerEnabled = true;
+        const min = parseInt(randFadeMin.value, 10);
+        const max = parseInt(randFadeMax.value, 10);
+        this.fadeTimerDuration = Math.floor(Math.random() * (max - min + 1)) + min;
+      } else {
+        this.isFadeTimerEnabled = false;
+      }
+
+      randomizerModal.hidden = true;
+      this.isPracticeMode = false;
+      this._startGameWithSettings({ isPractice: false });
+    }
+
+    setupGameSettings() {
+        this.gameMode = this.elements.modeSelector.value;
+        this.isMirrorTrack = (this.gameMode === 'mirror' && this.elements.modeOptionTrack.checked);
+        this.isMirrorMap = (this.gameMode === 'mirror' && this.elements.modeOptionMap.checked);
+        this.isMirrorSite = (this.gameMode === 'mirror' && this.elements.modeOptionSite.checked);
+        this.isInvertedTrack = (this.gameMode === 'inverted' && this.elements.modeOptionTrack.checked);
+        this.isInvertedMap = (this.gameMode === 'inverted' && this.elements.modeOptionMap.checked);
+        this.isInvertedSite = (this.gameMode === 'inverted' && this.elements.modeOptionSite.checked);
+        
+        this.isTimerEnabled = !this.elements.unlimitedTimeCheckbox.checked;
+        const roundDuration = parseInt(this.elements.roundTimerInput.value, 10);
+        this.timerDuration = !isNaN(roundDuration) && roundDuration >= 5 ? roundDuration : 30;
+        this.isFadeTimerEnabled = this.elements.fadeTimerCheckbox.checked;
+        const fadeDuration = parseInt(this.elements.fadeTimerInput.value, 10);
+        this.fadeTimerDuration = !isNaN(fadeDuration) && fadeDuration >= 1 ? fadeDuration : 10;
+    }
+    
+    _startGameWithSettings(options) {
+      this.seedWasModified = false;
+
+      if (options.isPractice) {
+        this.shuffledTracks = [options.practiceTrack];
+      } else {
+        const seedVal = this.elements.seedInput.value.trim();
+        this.gameSeed = seedVal !== '' ? seedVal : Math.floor(Math.random() * 100000);
+        const isSeededGame = seedVal !== '';
+        const enabledTracks = TRACKS_DATA.filter(t => t.enabled !== false);
+        let availableTracks = isSeededGame ? enabledTracks : enabledTracks.filter(track => !getUsedImages().includes(track.image));
+        if (!isSeededGame && availableTracks.length < MAX_ROUNDS) {
+          if (getUsedImages().length > 0) alert("Not enough new images. Resetting the cycle for you!");
+          clearUsedImages(); this.updateStatusText(); availableTracks = enabledTracks;
+        }
+        if (availableTracks.length === 0) { alert("Error: No images are available to play."); return; }
+        
+        const fullyShuffled = seededShuffle(availableTracks, this.gameSeed);
+        this.shuffledTracks = selectSpacedTracks(fullyShuffled, MAX_ROUNDS, MIN_DISTANCE);
+
+        if (this.shuffledTracks.length < MAX_ROUNDS) {
+            alert(`Warning: Could only find ${this.shuffledTracks.length} rounds that meet the minimum distance requirement. Your game will be shorter.`);
+        }
+      }
+
       this.score = 0;
       this.round = 0;
       this.elements.scoreDisplay.textContent = "Score: 0";
@@ -421,79 +546,31 @@ document.addEventListener("DOMContentLoaded", () => {
       this.applyInGameEffects();
       this.loadRound();
     }
-    
-    start() {
-      if (this.elements.modeSelector.value === "") {
-        alert("Please select a game mode first!");
-        return;
-      }
-
-      this.setupGameSettings();
-      this.isPracticeMode = false;
-      this.seedWasModified = false;
-      const hardcodedSeed = undefined;
-      const seedVal = (typeof hardcodedSeed !== 'undefined') ? hardcodedSeed : this.elements.seedInput.value.trim();
-      this.gameSeed = seedVal !== '' ? seedVal : Math.floor(Math.random() * 100000);
-      const isSeededGame = seedVal !== '';
-      const enabledTracks = TRACKS_DATA.filter(t => t.enabled !== false);
-      let availableTracks = isSeededGame ? enabledTracks : enabledTracks.filter(track => !getUsedImages().includes(track.image));
-      if (!isSeededGame && availableTracks.length < MAX_ROUNDS) {
-        if (getUsedImages().length > 0) alert("Not enough new images. Resetting the cycle for you!");
-        clearUsedImages(); this.updateStatusText(); availableTracks = enabledTracks;
-      }
-      if (availableTracks.length === 0) { alert("Error: No images are available to play."); return; }
-      
-      const fullyShuffled = seededShuffle(availableTracks, this.gameSeed);
-      this.shuffledTracks = selectSpacedTracks(fullyShuffled, MAX_ROUNDS, MIN_DISTANCE);
-
-      if (this.shuffledTracks.length < MAX_ROUNDS) {
-          alert(`Warning: Could only find ${this.shuffledTracks.length} rounds that meet the minimum distance requirement. Your game will be shorter.`);
-      }
-
-      this.score = 0; this.round = 0;
-      this.elements.scoreDisplay.textContent = "Score: 0";
-      document.body.classList.add('menu-active');
-      this.elements.menu.hidden = true;
-      this.elements.gameUI.hidden = false;
-      
-      this.applyInGameEffects();
-      this.loadRound();
-    }
-    
-    setupGameSettings() {
-        this.gameMode = this.elements.modeSelector.value;
-        
-        this.isTimerEnabled = !this.elements.unlimitedTimeCheckbox.checked;
-        const roundDuration = parseInt(this.elements.roundTimerInput.value, 10);
-        this.timerDuration = !isNaN(roundDuration) && roundDuration >= 5 ? roundDuration : 30;
-        this.isFadeTimerEnabled = this.elements.fadeTimerCheckbox.checked;
-        const fadeDuration = parseInt(this.elements.fadeTimerInput.value, 10);
-        this.fadeTimerDuration = !isNaN(fadeDuration) && fadeDuration >= 1 ? fadeDuration : 10;
-    }
 
     applyInGameEffects() {
-        const { trackImage, mapImage, modeOptionTrack, modeOptionMap } = this.elements;
+        const { trackImage, mapImage } = this.elements;
         
-        trackImage.style.transform = '';
-        trackImage.style.filter = '';
-        mapImage.style.transform = '';
-        mapImage.style.filter = '';
-        trackImage.classList.remove('inverted-by-js');
-        mapImage.classList.remove('inverted-by-js');
+        let trackTransforms = [];
+        let trackFilters = [];
+        let mapTransforms = [];
+        let mapFilters = [];
 
-        if (this.gameMode === 'mirror') {
-            if (modeOptionTrack.checked) trackImage.style.transform = 'scaleX(-1)';
-            if (modeOptionMap.checked) mapImage.style.transform = 'scaleX(-1)';
-        } else if (this.gameMode === 'inverted') {
-            if (modeOptionTrack.checked) {
-                trackImage.style.filter = 'invert(1)';
-                trackImage.classList.add('inverted-by-js');
-            }
-             if (modeOptionMap.checked) {
-                mapImage.style.filter = 'invert(1)';
-                mapImage.classList.add('inverted-by-js');
-            }
-        }
+        document.body.classList.toggle('mirror-site', this.isMirrorSite);
+        document.documentElement.classList.toggle('inverted-site', this.isInvertedSite);
+        
+        if (this.isMirrorTrack) trackTransforms.push('scaleX(-1)');
+        if (this.isInvertedTrack) trackFilters.push('invert(1)');
+        
+        if (this.isMirrorMap) mapTransforms.push('scaleX(-1)');
+        if (this.isInvertedMap) mapFilters.push('invert(1)');
+
+        trackImage.style.transform = trackTransforms.join(' ');
+        trackImage.style.filter = trackFilters.join(' ');
+        trackImage.classList.toggle('inverted-by-js', this.isInvertedTrack || this.isInvertedSite);
+
+        mapImage.style.transform = mapTransforms.join(' ');
+        mapImage.style.filter = mapFilters.join(' ');
+        mapImage.classList.toggle('inverted-by-js', this.isInvertedMap || this.isInvertedSite);
     }
     
     finalizeRoundSetup() {
@@ -536,9 +613,11 @@ document.addEventListener("DOMContentLoaded", () => {
     
     loadRound() {
       clearTimeout(this.imageFadeTimer);
+      clearInterval(this.fadeDisplayInterval); // ++ ADDED: Clear fade display timer
       this.elements.trackWrapper.classList.remove('faded-out');
       this.elements.trackNameDisplay.textContent = ""; 
       this.elements.magnifier.style.display = 'none';
+      this.elements.fadeTimerDisplay.hidden = true; // Hide display on new round
       
       this.pendingGuess = null;
       this.confirmedGuess = null;
@@ -572,14 +651,31 @@ document.addEventListener("DOMContentLoaded", () => {
       }, 1000);
     }
     
+    // ++ MODIFIED: This function now also handles the countdown display
     startImageFadeTimer() {
         clearTimeout(this.imageFadeTimer);
+        clearInterval(this.fadeDisplayInterval);
         if (!this.isFadeTimerEnabled) return;
         
         this.imageFadeTimer = setTimeout(() => {
             this.elements.trackWrapper.classList.add('faded-out');
             this.elements.magnifier.style.display = 'none';
         }, this.fadeTimerDuration * 1000);
+
+        if (this.elements.showFadeTimerCheckbox.checked) {
+            this.elements.fadeTimerDisplay.hidden = false;
+            let fadeTimeLeft = this.fadeTimerDuration;
+            this.elements.fadeTimerDisplay.textContent = `Fade in: ${fadeTimeLeft}s`;
+            
+            this.fadeDisplayInterval = setInterval(() => {
+                fadeTimeLeft--;
+                this.elements.fadeTimerDisplay.textContent = `Fade in: ${fadeTimeLeft}s`;
+                if (fadeTimeLeft <= 0) {
+                    clearInterval(this.fadeDisplayInterval);
+                    this.elements.fadeTimerDisplay.hidden = true;
+                }
+            }, 1000);
+        }
     }
 
     handleTimeout() {
@@ -597,7 +693,7 @@ document.addEventListener("DOMContentLoaded", () => {
             this.pendingGuess = null;
             
             let answerX = this.currentTrack.mapX;
-            if (this.gameMode === 'mirror' && this.elements.modeOptionMap.checked) {
+            if (this.isMirrorMap) {
                 answerX = (MAP_WIDTH - 1) - answerX;
             }
             
@@ -693,7 +789,7 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.magnifier.style.display = 'none';
       
       let answerX = this.currentTrack.mapX;
-      if (this.gameMode === 'mirror' && this.elements.modeOptionMap.checked) {
+      if (this.isMirrorMap) {
           answerX = (MAP_WIDTH - 1) - answerX;
       }
       
@@ -730,9 +826,11 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
     
+    // ++ MODIFIED: Cleanup now includes the new fade display interval ++
     stopAllTimers() {
         clearInterval(this.roundTimer);
         clearTimeout(this.imageFadeTimer);
+        clearInterval(this.fadeDisplayInterval);
     }
 
     hideGameAndShowMenu() {
@@ -747,9 +845,11 @@ document.addEventListener("DOMContentLoaded", () => {
       
       this.elements.mapImage.style.transform = 'none';
       this.elements.trackImage.style.transform = '';
+      this.elements.trackImage.style.filter = '';
       this.elements.nextBtn.textContent = 'Next Round';
       this.elements.timerDisplay.hidden = false;
       this.elements.trackNameDisplay.textContent = "";
+      this.elements.fadeTimerDisplay.hidden = true;
       
       this.displayLeaderboard();
       this.populatePracticeGrid();
@@ -860,11 +960,35 @@ document.addEventListener("DOMContentLoaded", () => {
     endGameBtn: document.getElementById('end-game-btn'),
     magnifier: document.getElementById('magnifier'),
     modeSelector: document.getElementById('mode-selector'),
-    // ++ REPLACED: New checkbox elements
     modeOptionsContainer: document.getElementById('mode-options-container'),
     modeOptionTrack: document.getElementById('mode-option-track'),
     modeOptionMap: document.getElementById('mode-option-map'),
     modeOptionSite: document.getElementById('mode-option-site'),
+    resetModeBtn: document.getElementById('reset-mode-btn'),
+    randomizerBtn: document.getElementById('randomizer-btn'),
+    randomizerModal: document.getElementById('randomizer-modal'),
+    startRandomBtn: document.getElementById('start-random-btn'),
+    cancelRandomBtn: document.getElementById('cancel-random-btn'),
+    resetRandomBtn: document.getElementById('reset-random-btn'),
+    randModeMirror: document.getElementById('rand-mode-mirror'),
+    randModeInverted: document.getElementById('rand-mode-inverted'),
+    randMirrorOptions: document.getElementById('rand-mirror-options'),
+    randMirrorTrack: document.getElementById('rand-mirror-track'),
+    randMirrorMap: document.getElementById('rand-mirror-map'),
+    randMirrorSite: document.getElementById('rand-mirror-site'),
+    randInvertedOptions: document.getElementById('rand-inverted-options'),
+    randInvertedTrack: document.getElementById('rand-inverted-track'),
+    randInvertedMap: document.getElementById('rand-inverted-map'),
+    randInvertedSite: document.getElementById('rand-inverted-site'),
+    randTimerEnable: document.getElementById('rand-timer-enable'),
+    randTimerMin: document.getElementById('rand-timer-min'),
+    randTimerMax: document.getElementById('rand-timer-max'),
+    randFadeEnable: document.getElementById('rand-fade-enable'),
+    randFadeMin: document.getElementById('rand-fade-min'),
+    randFadeMax: document.getElementById('rand-fade-max'),
+    // ++ ADDED: New elements for fade timer display
+    showFadeTimerCheckbox: document.getElementById('show-fade-timer-checkbox'),
+    fadeTimerDisplay: document.getElementById('fade-timer-display'),
   };
   
   new Game(elements);
@@ -881,14 +1005,24 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   elements.fadeTimerCheckbox.dispatchEvent(new Event('change'));
 
-  // ++ REFACTORED: All mode UI logic is now handled here ++
+  // ++ ADDED: Logic for the new "Show Fade Timer" checkbox ++
+  elements.showFadeTimerCheckbox.addEventListener('change', (e) => {
+    localStorage.setItem(SHOW_FADE_TIMER_KEY, e.target.checked);
+  });
+  function loadShowFadeTimerSetting() {
+    const saved = localStorage.getItem(SHOW_FADE_TIMER_KEY);
+    // Default to true if no setting is saved
+    elements.showFadeTimerCheckbox.checked = saved !== 'false';
+  }
+
   function applySiteEffects() {
-      document.body.classList.toggle('mirror-site', elements.modeSelector.value === 'mirror' && elements.modeOptionSite.checked);
-      document.documentElement.classList.toggle('inverted-site', elements.modeSelector.value === 'inverted' && elements.modeOptionSite.checked);
+      const mode = elements.modeSelector.value;
+      const isSiteOptionChecked = elements.modeOptionSite.checked;
+      document.body.classList.toggle('mirror-site', mode === 'mirror' && isSiteOptionChecked);
+      document.documentElement.classList.toggle('inverted-site', mode === 'inverted' && isSiteOptionChecked);
   }
 
   function handleModeOptionChange() {
-      // Logic for the "Site" checkbox overriding the others
       if (elements.modeOptionSite.checked) {
           elements.modeOptionTrack.checked = true;
           elements.modeOptionMap.checked = true;
@@ -899,7 +1033,6 @@ document.addEventListener("DOMContentLoaded", () => {
           elements.modeOptionMap.disabled = false;
       }
       
-      // Save current state
       localStorage.setItem(MODE_OPTION_TRACK_KEY, elements.modeOptionTrack.checked);
       localStorage.setItem(MODE_OPTION_MAP_KEY, elements.modeOptionMap.checked);
       localStorage.setItem(MODE_OPTION_SITE_KEY, elements.modeOptionSite.checked);
@@ -911,8 +1044,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const mode = elements.modeSelector.value;
       if (mode === 'normal' || mode === '') {
           elements.modeOptionsContainer.hidden = true;
+          elements.resetModeBtn.hidden = true;
       } else {
           elements.modeOptionsContainer.hidden = false;
+          elements.resetModeBtn.hidden = false;
       }
       handleModeOptionChange();
   }
@@ -922,12 +1057,10 @@ document.addEventListener("DOMContentLoaded", () => {
       updateModeOptionsUI();
   });
 
-  // Add a single listener to the container for all checkbox changes
   elements.modeOptionsContainer.addEventListener('change', handleModeOptionChange);
   
   function loadAndSetModeUI() {
       const savedMode = localStorage.getItem(MODE_KEY);
-      // Load saved checkbox states, defaulting to track=true if nothing is stored
       const track = localStorage.getItem(MODE_OPTION_TRACK_KEY) !== 'false'; 
       const map = localStorage.getItem(MODE_OPTION_MAP_KEY) === 'true';
       const site = localStorage.getItem(MODE_OPTION_SITE_KEY) === 'true';
@@ -990,4 +1123,60 @@ document.addEventListener("DOMContentLoaded", () => {
   
   loadAndSetThemeUI();
   loadAndSetModeUI();
+  loadShowFadeTimerSetting();
+
+  const setupRandomizerOptionGroup = (mainCheckbox, optionsContainer, trackBox, mapBox, siteBox) => {
+    mainCheckbox.addEventListener('change', () => {
+      optionsContainer.classList.toggle('disabled', !mainCheckbox.checked);
+    });
+    siteBox.addEventListener('change', () => {
+      if (siteBox.checked) {
+        trackBox.checked = true;
+        mapBox.checked = true;
+        trackBox.disabled = true;
+        mapBox.disabled = true;
+      } else {
+        trackBox.disabled = false;
+        mapBox.disabled = false;
+      }
+    });
+    optionsContainer.classList.toggle('disabled', !mainCheckbox.checked);
+    if(siteBox.checked) {
+        trackBox.disabled = true;
+        mapBox.disabled = true;
+    }
+  };
+
+  setupRandomizerOptionGroup(elements.randModeMirror, elements.randMirrorOptions, elements.randMirrorTrack, elements.randMirrorMap, elements.randMirrorSite);
+  setupRandomizerOptionGroup(elements.randModeInverted, elements.randInvertedOptions, elements.randInvertedTrack, elements.randInvertedMap, elements.randInvertedSite);
+
+  elements.randTimerEnable.addEventListener('change', () => {
+    elements.randTimerMin.disabled = !elements.randTimerEnable.checked;
+    elements.randTimerMax.disabled = !elements.randTimerEnable.checked;
+  });
+  elements.randFadeEnable.addEventListener('change', () => {
+    elements.randFadeMin.disabled = !elements.randFadeEnable.checked;
+    elements.randFadeMax.disabled = !elements.randFadeEnable.checked;
+  });
+  
+  elements.resetRandomBtn.addEventListener('click', () => {
+    elements.randModeMirror.checked = true;
+    elements.randModeInverted.checked = true;
+    elements.randMirrorTrack.checked = true;
+    elements.randMirrorMap.checked = true;
+    elements.randMirrorSite.checked = true;
+    elements.randInvertedTrack.checked = true;
+    elements.randInvertedMap.checked = true;
+    elements.randInvertedSite.checked = true;
+    elements.randTimerEnable.checked = true;
+    elements.randFadeEnable.checked = true;
+
+    elements.randModeMirror.dispatchEvent(new Event('change'));
+    elements.randModeInverted.dispatchEvent(new Event('change'));
+    elements.randMirrorSite.dispatchEvent(new Event('change'));
+    elements.randInvertedSite.dispatchEvent(new Event('change'));
+    elements.randTimerEnable.dispatchEvent(new Event('change'));
+    elements.randFadeEnable.dispatchEvent(new Event('change'));
+  });
+
 });
