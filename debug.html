@@ -6,25 +6,13 @@
     <title>Track Data Debug Page</title>
     <script src="data.js"></script>
     <script src="js/panzoom.js"></script>
+    <script src="heatmap.js"></script>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: #222;
-            color: #eee;
-            margin: 0;
-            padding: 20px;
-        }
-        h1 {
-            text-align: center;
-            border-bottom: 2px solid #555;
-            padding-bottom: 10px;
-        }
-        .debug-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 20px;
-            justify-content: center;
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #222; color: #eee; margin: 0; padding: 20px; }
+        h1 { text-align: center; border-bottom: 2px solid #555; padding-bottom: 10px; }
+        .debug-container { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
+        
+        /* --- STYLES FOR THE INDIVIDUAL "FIND IT" ITEMS --- */
         .debug-item {
             border: 2px solid #444;
             border-radius: 10px;
@@ -33,225 +21,159 @@
             width: 100%;
             max-width: 600px;
         }
-        .debug-item h2 {
-            margin-top: 0;
-            text-align: center;
-            color: #00aaff;
-        }
-        .debug-item .coords {
-            font-family: monospace;
-            font-size: 1.1em;
-            color: #ffaa00;
-        }
-        .track-photo {
-            width: 100%;
-            height: auto;
-            border-radius: 5px;
-            aspect-ratio: 3 / 2;
-            object-fit: contain;
-            background-color: #000;
-        }
-        
-        /* Styles for PanZoom functionality */
-        .debug-map-wrapper {
-            position: relative;
-            margin-top: 15px;
-            border: 1px solid #555;
-            overflow: hidden;
-            cursor: grab;
-            background-color: #3E7BB6;
-            aspect-ratio: 2004 / 1086;
-        }
+        .debug-item h2 { margin-top: 0; text-align: center; color: #00aaff; }
+        .track-photo { width: 100%; height: auto; border-radius: 5px; aspect-ratio: 3 / 2; object-fit: contain; background-color: #000; }
+        .debug-map-wrapper { position: relative; margin-top: 15px; border: 1px solid #555; overflow: hidden; cursor: grab; background-color: #3E7BB6; aspect-ratio: 2004 / 1086; }
         .debug-map-wrapper.grabbing { cursor: grabbing; }
-        .debug-map-container {
-            position: relative;
-            width: 2004px;
-            height: 1086px;
-            transform-origin: 0 0;
-        }
-        .map-image {
-            display: block;
-            width: 100%;
-            height: 100%;
-        }
-        .marker {
-            position: absolute;
-            width: 24px;
-            height: 24px;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-            z-index: 10;
-        }
-        .zoom-indicator-circle {
-            position: absolute;
-            width: 40px;
-            height: 40px;
-            border: 5px solid red;
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-            z-index: 5;
-            opacity: 1;
-            transition: opacity 0.3s ease-in-out;
-        }
+        .debug-map-container { position: relative; width: 2004px; height: 1086px; transform-origin: 0 0; }
+        .map-image { display: block; width: 100%; height: 100%; }
+        .marker { position: absolute; width: 24px; height: 24px; transform: translate(-50%, -50%); pointer-events: none; z-index: 10; }
+        .zoom-indicator-circle { position: absolute; width: 40px; height: 40px; border: 5px solid red; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 5; opacity: 1; transition: opacity 0.3s ease-in-out; }
         .zoom-indicator-circle.hidden { opacity: 0; }
 
-        /* Styles for Overview Map */
-        #full-map-overview-container {
-            position: relative;
-            width: 100%;
-            max-width: 1600px;
-            margin: 20px auto;
-            border: 3px solid #666;
-            border-radius: 10px;
-            background-color: #3E7BB6;
+        /* --- Styles for the bottom heatmap map --- */
+        #map-container { position: relative; width: 100%; max-width: 1600px; margin: 20px auto; border: 3px solid #666; border-radius: 10px; aspect-ratio: 2004 / 1086; overflow: hidden; }
+        #map-image-layer, #marker-overlay, #heatmap-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        
+        #map-image-layer { 
+            object-fit: contain; 
+            z-index: 1; 
+            transition: opacity 0.3s ease-in-out;
         }
-        #full-map-image {
-            display: block;
-            width: 100%;
-            height: auto;
-            border-radius: 7px;
-        }
-        .svg-marker {
-            position: absolute;
-            width: 18px;
-            height: 18px;
-            transform: translate(-50%, -50%);
-            cursor: help;
-            transition: transform 0.2s ease, filter 0.2s ease;
-            filter: drop-shadow(0 0 2px rgba(0,0,0,0.8));
-            z-index: 10;
-            overflow: visible;
-        }
-        .svg-marker:hover {
-            transform: translate(-50%, -50%) scale(2);
-            filter: drop-shadow(0 0 5px #fff);
-            z-index: 11;
-        }
-        #map-error-msg {
-            color: white;
-            text-align: center;
-            padding: 40px;
-            font-size: 1.5em;
-            font-weight: bold;
-            background: #c0392b;
-            border-radius: 7px;
-        }
+
+        #marker-overlay { z-index: 3; pointer-events: none; }
+        #heatmap-layer { z-index: 2; }
+        .svg-marker { position: absolute; width: 18px; height: 18px; transform: translate(-50%, -50%); cursor: help; filter: drop-shadow(0 0 2px rgba(0,0,0,0.8)); pointer-events: all; }
+        .svg-marker:hover { transform: translate(-50%, -50%) scale(2); filter: drop-shadow(0 0 5px #fff); z-index: 11; }
+        
+        #map-container #heatmap-layer { visibility: hidden; }
+        #map-container.view-heatmap #marker-overlay { visibility: hidden; }
+        #map-container.view-heatmap #heatmap-layer { visibility: visible; }
+        #map-container.view-heatmap #map-image-layer { opacity: 0.5; }
+
+        .map-controls { display: flex; justify-content: center; align-items: center; gap: 15px; margin-bottom: 20px; }
+        .toggle-switch { position: relative; display: inline-block; width: 60px; height: 34px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #555; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #c0392b; }
+        input:checked + .slider:before { transform: translateX(26px); }
     </style>
 </head>
 <body>
 
     <h1>Track Data Debug View</h1>
     <div id="debug-container" class="debug-container"></div>
-
     <hr style="margin: 40px 0; border: none; height: 2px; background-color: #555;">
-    <h1>Full Map Overview</h1>
-
-    <div id="full-map-overview-container">
-        <img id="full-map-image" src="map/mk_map.webp" alt="Full Map" 
-             onerror="this.style.display='none'; document.getElementById('map-error-msg').style.display='block'">
-        <div id="map-error-msg" style="display: none;">
-            MAP IMAGE FAILED TO LOAD!<br>
-            Check the path in your code (`src="map/mk_map.webp"`) and make sure you are running this page from a Live Server.
-        </div>
+    
+    <div class="map-controls">
+        <span>Markers</span>
+        <label class="toggle-switch">
+            <input type="checkbox" id="heatmap-toggle">
+            <span class="slider"></span>
+        </label>
+        <span>Heatmap</span>
     </div>
 
+    <div id="map-container">
+        <img id="map-image-layer" src="map/mk_map.webp" alt="Full Map">
+        <div id="marker-overlay"></div>
+        <div id="heatmap-layer"></div>
+    </div>
 
     <script>
-        const container = document.getElementById('debug-container');
+        window.onload = () => {
+            if (typeof TRACKS_DATA === 'undefined' || typeof PanZoom === 'undefined' || typeof h337 === 'undefined') {
+                document.body.innerHTML = '<h1>Error: Required library missing.</h1>';
+                return;
+            }
 
-        if (typeof TRACKS_DATA === 'undefined' || typeof PanZoom === 'undefined') {
-            // Error handling, no changes needed
-        } else {
             const MAP_WIDTH = 2004;
             const MAP_HEIGHT = 1086;
-
-            // Logic for Individual Debug Items (unchanged)
+            
+            const container = document.getElementById('debug-container');
             const createDebugItem = (track) => {
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'debug-item';
                 const leftPercent = (track.mapX / MAP_WIDTH) * 100;
                 const topPercent = (track.mapY / MAP_HEIGHT) * 100;
-                itemDiv.innerHTML = `
-                    <h2>${track.name || 'Unnamed'} <span class="coords">(${track.mapX}, ${track.mapY})</span></h2>
-                    <img class="track-photo" src="${track.image}" alt="${track.name}" loading="lazy">
-                    <div class="debug-map-wrapper">
-                        <div class="debug-map-container">
-                            <img class="map-image" src="map/mk_map.webp" alt="Full Map">
-                            <div class="zoom-indicator-circle" style="left: ${leftPercent}%; top: ${topPercent}%;"></div>
-                            <img class="marker" src="images/star.png" style="left: ${leftPercent}%; top: ${topPercent}%;">
-                        </div>
-                    </div>
-                `;
+                itemDiv.innerHTML = `<h2>${track.name || 'Unnamed'}</h2><img class="track-photo" src="${track.image}" alt="${track.name}" loading="lazy"><div class="debug-map-wrapper"><div class="debug-map-container"><img class="map-image" src="map/mk_map.webp" alt="Full Map"><div class="zoom-indicator-circle" style="left: ${leftPercent}%; top: ${topPercent}%;"></div><img class="marker" src="images/star.png" style="left: ${leftPercent}%; top: ${topPercent}%;"></div></div>`;
                 container.appendChild(itemDiv);
                 const wrapper = itemDiv.querySelector('.debug-map-wrapper');
                 const mapContainer = itemDiv.querySelector('.debug-map-container');
                 const circle = itemDiv.querySelector('.zoom-indicator-circle');
-                if (wrapper && mapContainer) {
-                    const pz = new PanZoom(wrapper, mapContainer, { fit: true, maxZoom: 8, onUpdate: () => {
-                        if (!pz.initialScale) return;
-                        const isClose = pz.scale > pz.initialScale * 3;
-                        circle.classList.toggle('hidden', isClose);
-                    }});
+                if (wrapper && mapContainer && circle) {
+                    const pz = new PanZoom(wrapper, mapContainer, { 
+                        fit: true, 
+                        maxZoom: 8, 
+                        onUpdate: () => {
+                            if (!pz.initialScale) return;
+                            const isClose = pz.scale > pz.initialScale * 3;
+                            circle.classList.toggle('hidden', isClose);
+                        }
+                    });
                     requestAnimationFrame(() => pz.reset());
                 }
             };
             TRACKS_DATA.forEach(track => {
-                const img = new Image();
-                img.onload = () => createDebugItem(track);
-                img.onerror = () => console.warn(`Skipping debug item: Image not found at ${track.image}`);
-                img.src = track.image;
+                if(track.image && track.enabled !== false) {
+                    const img = new Image();
+                    img.onload = () => createDebugItem(track);
+                    img.onerror = () => console.warn(`Skipping debug item: Image not found at ${track.image}`);
+                    img.src = track.image;
+                }
             });
 
-            // --- START: MODIFIED Logic for Full Map Overview ---
-            const fullMapContainer = document.getElementById('full-map-overview-container');
+            const mapContainer = document.getElementById('map-container');
+            const markerOverlay = document.getElementById('marker-overlay');
+            const heatmapLayer = document.getElementById('heatmap-layer');
+            const heatmapToggle = document.getElementById('heatmap-toggle');
+
             const markerFragment = document.createDocumentFragment();
             const svgNS = "http://www.w3.org/2000/svg";
-
-            // Define the color mapping for each creator
-            const creatorColors = {
-                'SudaiDelphi':    { fill: '#9b59b6', stroke: '#8e44ad' }, // Purple
-                'Electric_Hoodie':{ fill: '#3498db', stroke: '#2980b9' }, // Blue
-                'Crazalu':        { fill: '#f1c40f', stroke: '#f39c12' }, // Gold
-                'default':        { fill: '#2ecc71', stroke: '#27ae60' }  // Green
-            };
-
+            const creatorColors = { 'SudaiDelphi': { fill: '#9b59b6'}, 'Electric_Hoodie':{ fill: '#3498db'}, 'Crazalu': { fill: '#f1c40f'}, 'default': { fill: '#2ecc71'} };
             TRACKS_DATA.forEach(track => {
                 if (track.enabled === false) return;
-
-                const leftPercent = (track.mapX / MAP_WIDTH) * 100;
-                const topPercent = (track.mapY / MAP_HEIGHT) * 100;
-
-                // Determine the correct color based on the credit, or use default
-                const creator = track.credit || 'default';
-                const colors = creatorColors[creator] || creatorColors['default'];
-
-                const markerSvg = document.createElementNS(svgNS, "svg");
-                markerSvg.setAttribute("class", "svg-marker");
-                markerSvg.setAttribute("viewBox", "0 0 51 48");
-                markerSvg.style.left = `${leftPercent}%`;
-                markerSvg.style.top = `${topPercent}%`;
-                
-                const title = document.createElementNS(svgNS, "title");
-                title.textContent = `${track.name} (${track.mapX}, ${track.mapY}) - by ${creator}`;
-                markerSvg.appendChild(title);
-
-                const star = document.createElementNS(svgNS, "polygon");
-                star.setAttribute("points", "25,1 31,17 49,17 35,28 40,45 25,35 10,45 15,28 1,17 19,17");
-                
-                // Apply the selected colors
-                star.setAttribute("fill", colors.fill);
-                star.setAttribute("stroke", colors.stroke);
-
-                star.setAttribute("stroke-width", "2");
-                markerSvg.appendChild(star);
-                
+                const leftPercent = (track.mapX / MAP_WIDTH) * 100; const topPercent = (track.mapY / MAP_HEIGHT) * 100;
+                const creator = track.credit || 'default'; const colors = creatorColors[creator] || creatorColors['default'];
+                const markerSvg = document.createElementNS(svgNS, "svg"); markerSvg.setAttribute("class", "svg-marker"); markerSvg.setAttribute("viewBox", "0 0 51 48");
+                markerSvg.style.left = `${leftPercent}%`; markerSvg.style.top = `${topPercent}%`;
+                const title = document.createElementNS(svgNS, "title"); title.textContent = `${track.name} (${track.mapX}, ${track.mapY}) - by ${creator}`; markerSvg.appendChild(title);
+                const star = document.createElementNS(svgNS, "polygon"); star.setAttribute("points", "25,1 31,17 49,17 35,28 40,45 25,35 10,45 15,28 1,17 19,17");
+                star.setAttribute("fill", colors.fill); star.setAttribute("stroke", "#000"); star.setAttribute("stroke-width", "2"); markerSvg.appendChild(star);
                 markerFragment.appendChild(markerSvg);
             });
-            fullMapContainer.appendChild(markerFragment);
-            // --- END: MODIFIED Logic for Full Map Overview ---
-        }
-    </script>
+            markerOverlay.appendChild(markerFragment);
 
+            // --- MODIFICATION: Added a 'gradient' property for new colors ---
+            let heatmapInstance = h337.create({ 
+                container: heatmapLayer,
+                gradient: {
+                    // Start of the gradient, the coolest color (low density)
+                    '.4': 'blue', 
+                    // A transition point
+                    '.65': 'lime',
+                    '.9': 'yellow',
+                    // The hottest color (high density)
+                    '1.0': 'red'
+                }
+            });
+            
+            const generateHeatmapData = () => {
+                const mapRect = mapContainer.getBoundingClientRect();
+                if (mapRect.width === 0) return;
+                const points = [];
+                TRACKS_DATA.forEach(track => {
+                    if (track.enabled === false) return;
+                    points.push({ x: Math.round((track.mapX / MAP_WIDTH) * mapRect.width), y: Math.round((track.mapY / MAP_HEIGHT) * mapRect.height), value: 1 });
+                });
+                heatmapInstance.setData({ max: 5, data: points });
+            };
+            
+            generateHeatmapData(); 
+            heatmapToggle.addEventListener('change', (e) => mapContainer.classList.toggle('view-heatmap', e.target.checked));
+            window.addEventListener('resize', generateHeatmapData);
+        };
+    </script>
 </body>
 </html>
