@@ -12,46 +12,75 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #222; color: #eee; margin: 0; padding: 20px; }
         body.modal-open { overflow: hidden; }
 
-        h1 { text-align: center; border-bottom: 2px solid #555; padding-bottom: 10px; }
-
-        /* --- Main Map Styles --- */
-        #map-container { 
-            position: relative; 
-            width: 100%; 
-            max-width: 1600px; 
-            margin: 20px auto; 
-            border: 3px solid #666; 
-            border-radius: 10px; 
-            aspect-ratio: 2004 / 1086; 
-            overflow: hidden; 
-            cursor: grab;
+        /* --- PASSWORD OVERLAY STYLES --- */
+        #password-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: #222;
+            z-index: 2000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
-        #map-container.grabbing { cursor: grabbing; }
-
-        #panzoom-content {
-            position: relative;
-            width: 2004px;
-            height: 1086px;
-            transform-origin: 0 0;
+        #password-box {
+            background: #333;
+            padding: 30px;
+            border-radius: 10px;
+            border: 2px solid #555;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+        #password-box h2 { margin-top: 0; color: #00aaff; }
+        #password-input {
+            padding: 10px;
+            font-size: 1.2em;
+            border-radius: 5px;
+            border: 2px solid #666;
+            background: #444;
+            color: #eee;
+            margin-bottom: 15px;
+            transition: border-color 0.2s;
+        }
+        #password-input:focus { outline: none; border-color: #00aaff; }
+        #password-submit {
+            padding: 10px 20px;
+            font-size: 1.2em;
+            border-radius: 5px;
+            border: none;
+            background-color: #0088cc;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        #password-submit:hover { background-color: #00aaff; }
+        .password-error { border-color: red !important; animation: shake 0.5s; }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
         }
 
-        /* All layers are now inside the panzoom-content */
-        #map-image-layer, #marker-overlay, #heatmap-layer { 
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+        /* Initially hide the main content */
+        #main-content {
+            display: none;
         }
         
+        h1 { text-align: center; border-bottom: 2px solid #555; padding-bottom: 10px; }
+        #map-container { position: relative; width: 100%; max-width: 1600px; margin: 20px auto; border: 3px solid #666; border-radius: 10px; aspect-ratio: 2004 / 1086; overflow: hidden; cursor: grab; }
+        #map-container.grabbing { cursor: grabbing; }
+        #panzoom-content { position: relative; width: 2004px; height: 1086px; transform-origin: 0 0; }
+        #map-image-layer, #marker-overlay, #heatmap-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
         #map-image-layer { object-fit: contain; z-index: 1; transition: opacity 0.3s ease-in-out; }
         #marker-overlay { z-index: 3; }
         #heatmap-layer { z-index: 2; pointer-events: none; }
-        
         .svg-marker { position: absolute; width: 18px; height: 18px; transform: translate(-50%, -50%); cursor: pointer; filter: drop-shadow(0 0 2px rgba(0,0,0,0.8)); }
         .svg-marker:hover { transform: translate(-50%, -50%) scale(2); filter: drop-shadow(0 0 5px #fff); z-index: 11; }
-        
         #map-container #heatmap-layer { visibility: hidden; }
         #map-container.view-heatmap #marker-overlay { visibility: hidden; }
         #map-container.view-heatmap #heatmap-layer { visibility: visible; }
         #map-container.view-heatmap #map-image-layer { opacity: 0.5; }
-
         .map-controls { display: flex; justify-content: center; align-items: center; gap: 15px; margin-bottom: 20px; }
         .toggle-switch { position: relative; display: inline-block; width: 60px; height: 34px; }
         .toggle-switch input { opacity: 0; width: 0; height: 0; }
@@ -59,9 +88,7 @@
         .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
         input:checked + .slider { background-color: #c0392b; }
         input:checked + .slider:before { transform: translateX(26px); }
-
         #custom-tooltip { position: fixed; display: none; background: rgba(0, 0, 0, 0.8); color: white; padding: 5px 10px; border-radius: 5px; font-size: 0.9em; z-index: 9999; pointer-events: none; white-space: nowrap; }
-        
         .modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); z-index: 1000; display: none; justify-content: center; align-items: center; }
         .modal-content { position: relative; background: #333; padding: 20px; border-radius: 10px; max-width: 90vw; max-height: 90vh; display: flex; flex-direction: column; gap: 15px; }
         .modal-close { position: absolute; top: 5px; right: 15px; font-size: 2.5em; color: #aaa; cursor: pointer; line-height: 1; transition: color 0.2s; }
@@ -72,118 +99,147 @@
 </head>
 <body>
 
-    <h1>Track Data Interactive Map</h1>
-    
-    <div class="map-controls">
-        <span>Markers</span>
-        <label class="toggle-switch">
-            <input type="checkbox" id="heatmap-toggle">
-            <span class="slider"></span>
-        </label>
-        <span>Heatmap</span>
-    </div>
-
-    <div id="map-container">
-        <div id="panzoom-content">
-            <img id="map-image-layer" src="map/mk_map.webp" alt="Full Map">
-            <div id="marker-overlay"></div>
-            <div id="heatmap-layer"></div>
+    <div id="password-overlay">
+        <div id="password-box">
+            <h2>Enter Password</h2>
+            <input type="password" id="password-input" autofocus>
+            <button id="password-submit">Enter</button>
         </div>
     </div>
 
-    <div id="image-modal-backdrop" class="modal-backdrop">
-        <div class="modal-content">
-            <span id="modal-close-btn" class="modal-close">×</span>
-            <h2 id="modal-title"></h2>
-            <img id="modal-image" src="" alt="Track Image">
+    <main id="main-content">
+        <h1>Track Data Interactive Map</h1>
+        <div class="map-controls">
+            <span>Markers</span>
+            <label class="toggle-switch">
+                <input type="checkbox" id="heatmap-toggle">
+                <span class="slider"></span>
+            </label>
+            <span>Heatmap</span>
         </div>
-    </div>
-
-    <div id="custom-tooltip"></div>
+        <div id="map-container">
+            <div id="panzoom-content">
+                <img id="map-image-layer" src="map/mk_map.webp" alt="Full Map">
+                <div id="marker-overlay"></div>
+                <div id="heatmap-layer"></div>
+            </div>
+        </div>
+        <div id="image-modal-backdrop" class="modal-backdrop">
+            <div class="modal-content">
+                <span id="modal-close-btn" class="modal-close">×</span>
+                <h2 id="modal-title"></h2>
+                <img id="modal-image" src="" alt="Track Image">
+            </div>
+        </div>
+        <div id="custom-tooltip"></div>
+    </main>
 
     <script>
-        window.onload = () => {
-            if (typeof TRACKS_DATA === 'undefined' || typeof PanZoom === 'undefined' || typeof h337 === 'undefined') {
-                document.body.innerHTML = '<h1>Error: Required library missing.</h1>'; return;
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- PASSWORD PROTECTION LOGIC (RELIABLE VERSION) ---
+            const passwordOverlay = document.getElementById('password-overlay');
+            const passwordInput = document.getElementById('password-input');
+            const passwordSubmit = document.getElementById('password-submit');
+            const mainContent = document.getElementById('main-content');
+            // This is "sudaidelphi" encoded in Base64
+            const correctEncoded = 'c3VkYWlkZWxwaGk=';
+
+            function checkPassword() {
+                // Normalize the input (lowercase, no extra spaces)
+                const inputText = passwordInput.value.toLowerCase().trim();
+                if (!inputText) return;
+                
+                // Base64 encode the user's input
+                const inputEncoded = btoa(inputText);
+
+                if (inputEncoded === correctEncoded) {
+                    passwordOverlay.style.display = 'none';
+                    mainContent.style.display = 'block';
+                    initializeMap(); // Only initialize the map after successful login
+                } else {
+                    passwordInput.classList.add('password-error');
+                    setTimeout(() => passwordInput.classList.remove('password-error'), 500);
+                    passwordInput.value = '';
+                }
             }
-
-            const MAP_WIDTH = 2004; const MAP_HEIGHT = 1086;
-
-            const mapContainer = document.getElementById('map-container');
-            const panzoomContent = document.getElementById('panzoom-content');
-            const markerOverlay = document.getElementById('marker-overlay');
-            const heatmapLayer = document.getElementById('heatmap-layer');
-            const heatmapToggle = document.getElementById('heatmap-toggle');
-            const tooltip = document.getElementById('custom-tooltip');
-            
-            const modalBackdrop = document.getElementById('image-modal-backdrop');
-            const modalTitle = document.getElementById('modal-title');
-            const modalImage = document.getElementById('modal-image');
-            const modalCloseBtn = document.getElementById('modal-close-btn');
-
-            function openModal(track) { modalTitle.textContent = track.name; modalImage.src = track.image; modalImage.alt = track.name; modalBackdrop.style.display = 'flex'; document.body.classList.add('modal-open'); }
-            function closeModal() { modalBackdrop.style.display = 'none'; document.body.classList.remove('modal-open'); modalImage.src = ""; }
-            modalCloseBtn.addEventListener('click', closeModal);
-            modalBackdrop.addEventListener('click', (e) => { if (e.target === modalBackdrop) closeModal(); });
-            window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
-
-            const markerFragment = document.createDocumentFragment();
-            const svgNS = "http://www.w3.org/2000/svg";
-            const creatorColors = { 'SudaiDelphi': { fill: '#9b59b6'}, 'Electric_Hoodie':{ fill: '#3498db'}, 'Crazalu': { fill: '#f1c40f'}, 'pigeon': { fill: '#bdc3c7'}, 'LapisSR_': { fill: '#1abc9c'}, 'default': { fill: '#2ecc71'} };
-            
-            TRACKS_DATA.forEach(track => {
-                if (track.enabled === false) return;
-                const leftPercent = (track.mapX / MAP_WIDTH) * 100; const topPercent = (track.mapY / MAP_HEIGHT) * 100;
-                const creator = track.credit || 'default'; const colors = creatorColors[creator] || creatorColors['default'];
-                const markerSvg = document.createElementNS(svgNS, "svg");
-                markerSvg.setAttribute("class", "svg-marker"); markerSvg.setAttribute("viewBox", "0 0 51 48");
-                markerSvg.style.left = `${leftPercent}%`; markerSvg.style.top = `${topPercent}%`;
-
-                const tooltipText = `${track.name} (${track.mapX}, ${track.mapY}) - by ${creator}`;
-                markerSvg.addEventListener('mouseenter', () => { tooltip.innerHTML = tooltipText; tooltip.style.display = 'block'; });
-                markerSvg.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
-                markerSvg.addEventListener('mousemove', (e) => { tooltip.style.left = e.clientX + 15 + 'px'; tooltip.style.top = e.clientY + 15 + 'px'; });
-
-                markerSvg.addEventListener('click', () => openModal(track));
-
-                const star = document.createElementNS(svgNS, "polygon");
-                star.setAttribute("points", "25,1 31,17 49,17 35,28 40,45 25,35 10,45 15,28 1,17 19,17");
-                star.setAttribute("fill", colors.fill); star.setAttribute("stroke", "#000"); star.setAttribute("stroke-width", "2");
-                markerSvg.appendChild(star);
-                markerFragment.appendChild(markerSvg);
+            passwordSubmit.addEventListener('click', checkPassword);
+            passwordInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    checkPassword();
+                }
             });
-            markerOverlay.appendChild(markerFragment);
-            
-            // Heatmap Setup
-            let heatmapInstance = h337.create({ container: heatmapLayer, gradient: { '.4': 'blue', '.65': 'lime', '.9': 'yellow', '1.0': 'red' }});
-            
-            // Heatmap data is now generated once, using the full-size coordinates
-            const generateHeatmapData = () => {
-                const points = [];
+
+            // --- MAIN MAP INITIALIZATION (WRAPPED IN A FUNCTION) ---
+            function initializeMap() {
+                if (typeof TRACKS_DATA === 'undefined' || typeof PanZoom === 'undefined' || typeof h337 === 'undefined') {
+                    document.body.innerHTML = '<h1>Error: Required library missing.</h1>'; return;
+                }
+
+                const MAP_WIDTH = 2004; const MAP_HEIGHT = 1086;
+                const mapContainer = document.getElementById('map-container');
+                const panzoomContent = document.getElementById('panzoom-content');
+                const markerOverlay = document.getElementById('marker-overlay');
+                const heatmapLayer = document.getElementById('heatmap-layer');
+                const heatmapToggle = document.getElementById('heatmap-toggle');
+                const tooltip = document.getElementById('custom-tooltip');
+                
+                const modalBackdrop = document.getElementById('image-modal-backdrop');
+                const modalTitle = document.getElementById('modal-title');
+                const modalImage = document.getElementById('modal-image');
+                const modalCloseBtn = document.getElementById('modal-close-btn');
+
+                function openModal(track) { modalTitle.textContent = track.name; modalImage.src = track.image; modalImage.alt = track.name; modalBackdrop.style.display = 'flex'; document.body.classList.add('modal-open'); }
+                function closeModal() { modalBackdrop.style.display = 'none'; document.body.classList.remove('modal-open'); modalImage.src = ""; }
+                modalCloseBtn.addEventListener('click', closeModal);
+                modalBackdrop.addEventListener('click', (e) => { if (e.target === modalBackdrop) closeModal(); });
+                window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+
+                const markerFragment = document.createDocumentFragment();
+                const svgNS = "http://www.w3.org/2000/svg";
+                const creatorColors = { 'SudaiDelphi': { fill: '#9b59b6'}, 'Electric_Hoodie':{ fill: '#3498db'}, 'Crazalu': { fill: '#f1c40f'}, 'pigeon': { fill: '#bdc3c7'}, 'LapisSR_': { fill: '#1abc9c'}, 'default': { fill: '#2ecc71'} };
+                
                 TRACKS_DATA.forEach(track => {
                     if (track.enabled === false) return;
-                    points.push({ x: track.mapX, y: track.mapY, value: 1 });
+                    const leftPercent = (track.mapX / MAP_WIDTH) * 100; const topPercent = (track.mapY / MAP_HEIGHT) * 100;
+                    const creator = track.credit || 'default'; const colors = creatorColors[creator] || creatorColors['default'];
+                    const markerSvg = document.createElementNS(svgNS, "svg");
+                    markerSvg.setAttribute("class", "svg-marker"); markerSvg.setAttribute("viewBox", "0 0 51 48");
+                    markerSvg.style.left = `${leftPercent}%`; markerSvg.style.top = `${topPercent}%`;
+                    const tooltipText = `${track.name} (${track.mapX}, ${track.mapY}) - by ${creator}`;
+                    markerSvg.addEventListener('mouseenter', () => { tooltip.innerHTML = tooltipText; tooltip.style.display = 'block'; });
+                    markerSvg.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+                    markerSvg.addEventListener('mousemove', (e) => { tooltip.style.left = e.clientX + 15 + 'px'; tooltip.style.top = e.clientY + 15 + 'px'; });
+                    markerSvg.addEventListener('click', () => openModal(track));
+                    const star = document.createElementNS(svgNS, "polygon");
+                    star.setAttribute("points", "25,1 31,17 49,17 35,28 40,45 25,35 10,45 15,28 1,17 19,17");
+                    star.setAttribute("fill", colors.fill); star.setAttribute("stroke", "#000"); star.setAttribute("stroke-width", "2");
+                    markerSvg.appendChild(star);
+                    markerFragment.appendChild(markerSvg);
                 });
-                heatmapInstance.setData({ max: 5, data: points });
-            };
+                markerOverlay.appendChild(markerFragment);
+                
+                let heatmapInstance = h337.create({ container: heatmapLayer, gradient: { '.4': 'blue', '.65': 'lime', '.9': 'yellow', '1.0': 'red' }});
+                
+                const generateHeatmapData = () => {
+                    const points = [];
+                    TRACKS_DATA.forEach(track => {
+                        if (track.enabled === false) return;
+                        points.push({ x: track.mapX, y: track.mapY, value: 1 });
+                    });
+                    heatmapInstance.setData({ max: 5, data: points });
+                };
 
-            // Panzoom Initialization on the correct elements
-            const pz = new PanZoom(mapContainer, panzoomContent, {
-                maxZoom: 8,
-                minZoom: 0.5
-            });
+                const pz = new PanZoom(mapContainer, panzoomContent, { maxZoom: 8, minZoom: 0.5 });
+                
+                generateHeatmapData(); 
+                requestAnimationFrame(() => pz.reset()); 
 
-            // Set initial state
-            generateHeatmapData(); 
-            requestAnimationFrame(() => pz.reset()); // Use reset for a clean 1:1 start
-
-            heatmapToggle.addEventListener('change', (e) => {
-                // The toggle only controls visibility. Panzoom handles the rest.
-                mapContainer.classList.toggle('view-heatmap', e.target.checked);
-            });
-            
-            // No resize listener is needed for heatmap anymore since it's part of the zoom content
-        };
+                heatmapToggle.addEventListener('change', (e) => {
+                    mapContainer.classList.toggle('view-heatmap', e.target.checked);
+                });
+            }
+        });
     </script>
 </body>
 </html>
