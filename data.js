@@ -44,7 +44,7 @@ const TRACKS_DATA = [
   { image: "images/img41.webp", name: "Tin Tunnel Man", mapX: 425, mapY: 363, credit: "SudaiDelphi" },
   { image: "images/img42.webp", name: "Look at those plebs...", mapX: 323, mapY: 413, credit: "SudaiDelphi" },
   { image: "images/img43.webp", name: "Look at me, mom!", mapX: 359, mapY: 538, credit: "SudaiDelphi" },
-  { image: "images/img44.webp", name: "Swimming, Swimming", mapX: 1021, mapY: 666, credit: "SudaiDelphi" },
+  { image: "images/img44.webp", name: "Swimming, Swimming", mapX: 1041, mapY: 682, credit: "SudaiDelphi" },
   { image: "images/img45.webp", name: "RIP to Sweats", mapX: 805, mapY: 131, credit: "SudaiDelphi" },
   { image: "images/img46.webp", name: "Tropical Rainforest", mapX: 1038, mapY: 160, credit: "SudaiDelphi" },
   { image: "images/img47.webp", name: "Greenery Scenery", mapX: 958, mapY: 161, credit: "SudaiDelphi" },
