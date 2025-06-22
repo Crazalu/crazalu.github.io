@@ -1,6 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
   const MAX_ROUNDS = 5;
   const USED_IMAGES_KEY = 'marioKartGeoGuessr_usedImages';
+  const PRACTICE_UNLOCKS_KEY = 'marioKartGeoGuessr_practiceUnlocks';
   const LEADERBOARD_KEY = 'marioKartGeoGuessr_leaderboard';
   const LEADERBOARD_MAX_ENTRIES = 5;
   const MAP_WIDTH = 2004;
@@ -9,6 +10,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const getUsedImages = () => JSON.parse(localStorage.getItem(USED_IMAGES_KEY)) || [];
   const setUsedImages = (list) => localStorage.setItem(USED_IMAGES_KEY, JSON.stringify(list));
   const clearUsedImages = () => localStorage.removeItem(USED_IMAGES_KEY);
+  
+  const getPracticeUnlocks = () => JSON.parse(localStorage.getItem(PRACTICE_UNLOCKS_KEY)) || [];
+  const setPracticeUnlocks = (list) => localStorage.setItem(PRACTICE_UNLOCKS_KEY, JSON.stringify(list));
+
   const getLeaderboard = () => JSON.parse(localStorage.getItem(LEADERBOARD_KEY)) || [];
   const setLeaderboard = (scores) => localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(scores));
   const generateDataHash = (data) => JSON.stringify(data).split('').reduce((acc, char) => (acc * 31 + char.charCodeAt(0)) | 0, 0);
@@ -46,7 +51,7 @@ document.addEventListener("DOMContentLoaded", () => {
       this.offset = { x: 0, y: 0 }; this.scale = 1; this.isDown = false; this.didPan = false;
       this.prevPos = { x: 0, y: 0 }; this.prevPinchDist = null;
       this.onUpCallback = options.onUp || null;
-      this.onUpdateCallback = options.onUpdate || null; // ++ ADDED: Store the onUpdate callback
+      this.onUpdateCallback = options.onUpdate || null;
       this.bindEvents();
       this.wrapper.style.cursor = 'grab';
     }
@@ -88,7 +93,6 @@ document.addEventListener("DOMContentLoaded", () => {
       this.offset.y = Math.max(-oY, Math.min(0, this.offset.y));
       this.container.style.transform = `scale(${this.scale}) translate(${this.offset.x}px, ${this.offset.y}px)`;
       
-      // ++ ADDED: Call the onUpdate callback whenever the transform changes
       if (this.onUpdateCallback) {
         this.onUpdateCallback();
       }
@@ -175,7 +179,6 @@ document.addEventListener("DOMContentLoaded", () => {
     constructor(elements) {
       this.elements = elements;
       this.trackPanZoom = new PanZoom(elements.trackWrapper, elements.trackContainer);
-      // ++ MODIFIED: Pass the onUpdate callback to the map's PanZoom instance
       this.mapPanZoom = new PanZoom(elements.mapWrapper, elements.mapContainer, {
         fit: true,
         maxZoom: 8,
@@ -188,9 +191,8 @@ document.addEventListener("DOMContentLoaded", () => {
       this.updateStatusText();
       this.displayLeaderboard();
       
-      // ++ ADDED: State properties for guesses
-      this.pendingGuess = null;   // Stores {x, y} of the unconfirmed guess
-      this.confirmedGuess = null; // Stores {x, y} of the confirmed guess
+      this.pendingGuess = null;
+      this.confirmedGuess = null;
 
       this.isMirrorMode = false;
       this.isPracticeMode = false;
@@ -205,17 +207,14 @@ document.addEventListener("DOMContentLoaded", () => {
       this.imageFadeTimer = null;
     }
 
-    // ++ NEW METHOD: Centralizes all marker drawing logic.
     updateMarkerPositions() {
       const { scale, offset } = this.mapPanZoom;
-
-      // Helper to calculate pixel position from logical map coordinates
       const getPixelPos = (logicalPos) => ({
           x: (logicalPos.x + offset.x) * scale,
           y: (logicalPos.y + offset.y) * scale
       });
 
-      // Update the temporary guess marker
+      // Show temporary guess marker if it exists
       if (this.pendingGuess) {
           const pixelPos = getPixelPos(this.pendingGuess);
           this.elements.markerGuess.style.left = `${pixelPos.x}px`;
@@ -225,13 +224,13 @@ document.addEventListener("DOMContentLoaded", () => {
           this.elements.markerGuess.hidden = true;
       }
 
-      // Update the confirmed player marker, answer marker, and line
-      if (this.confirmedGuess) {
-          const playerPixelPos = getPixelPos(this.confirmedGuess);
-          this.elements.markerPlayer.style.left = `${playerPixelPos.x}px`;
-          this.elements.markerPlayer.style.top = `${playerPixelPos.y}px`;
-          this.elements.markerPlayer.hidden = false;
+      // Hide all results initially
+      this.elements.markerPlayer.hidden = true;
+      this.elements.markerAnswer.hidden = true;
+      this.elements.guessLine.style.display = 'none';
 
+      // Show results if the round is over
+      if (!this.canGuess) {
           const answerLogicalPos = {
               x: this.transformX(this.currentTrack.mapX),
               y: this.currentTrack.mapY
@@ -241,15 +240,19 @@ document.addEventListener("DOMContentLoaded", () => {
           this.elements.markerAnswer.style.top = `${answerPixelPos.y}px`;
           this.elements.markerAnswer.hidden = false;
 
-          this.elements.guessLine.setAttribute("x1", answerPixelPos.x);
-          this.elements.guessLine.setAttribute("y1", answerPixelPos.y);
-          this.elements.guessLine.setAttribute("x2", playerPixelPos.x);
-          this.elements.guessLine.setAttribute("y2", playerPixelPos.y);
-          this.elements.guessLine.style.display = "block";
-      } else {
-          this.elements.markerPlayer.hidden = true;
-          this.elements.markerAnswer.hidden = true;
-          this.elements.guessLine.style.display = "none";
+          // Only show player marker and line if there was a confirmed guess
+          if (this.confirmedGuess) {
+              const playerPixelPos = getPixelPos(this.confirmedGuess);
+              this.elements.markerPlayer.style.left = `${playerPixelPos.x}px`;
+              this.elements.markerPlayer.style.top = `${playerPixelPos.y}px`;
+              this.elements.markerPlayer.hidden = false;
+
+              this.elements.guessLine.setAttribute("x1", answerPixelPos.x);
+              this.elements.guessLine.setAttribute("y1", answerPixelPos.y);
+              this.elements.guessLine.setAttribute("x2", playerPixelPos.x);
+              this.elements.guessLine.setAttribute("y2", playerPixelPos.y);
+              this.elements.guessLine.style.display = "block";
+          }
       }
     }
     
@@ -257,7 +260,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const grid = this.elements.practiceGrid;
       grid.innerHTML = '';
       const enabledTracks = TRACKS_DATA.filter(t => t.enabled !== false);
-      const usedImages = getUsedImages();
+      const unlockedImages = getPracticeUnlocks();
 
       enabledTracks.forEach(track => {
         const card = document.createElement('div');
@@ -270,7 +273,8 @@ document.addEventListener("DOMContentLoaded", () => {
         p.textContent = track.name || 'Unnamed';
         card.appendChild(img);
         card.appendChild(p);
-        if (usedImages.includes(track.image)) {
+        
+        if (unlockedImages.includes(track.image)) {
             card.addEventListener('click', () => this.startPracticeRound(track));
         } else {
             card.classList.add('locked');
@@ -302,11 +306,11 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.confirmBtn.addEventListener('click', () => this.confirmGuess());
       this.elements.endGameBtn.addEventListener('click', () => this.showFinalResults());
       this.elements.resetUsedBtn.addEventListener('click', () => { 
-        if (confirm("Are you sure? This will reset your seen images history.")) { 
+        if (confirm("Are you sure? This will reset your seen images history for the main game. Your practice mode unlocks will NOT be affected.")) { 
           clearUsedImages(); 
           this.updateStatusText(); 
           this.populatePracticeGrid();
-          alert("Seen images have been reset!"); 
+          alert("Seen images for the game cycle have been reset!"); 
         } 
       });
       this.elements.backToMenuBtn.addEventListener('click', () => { if (confirm("Are you sure you want to quit? Your score will not be saved.")) { this.hideGameAndShowMenu(); } });
@@ -383,7 +387,7 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.roundDisplay.textContent = `Round ${this.round + 1} / ${totalRounds}`;
       const credit = this.currentTrack.credit || "Crazalu";
       this.elements.trackCredit.textContent = `Credit: ${credit}`;
-      this.updateMarkerPositions(); // Redraw markers (which will hide them all)
+      this.updateMarkerPositions();
       this.startRoundTimer();
       this.startImageFadeTimer();
     }
@@ -393,7 +397,6 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.trackWrapper.classList.remove('faded-out');
       this.elements.trackNameDisplay.textContent = ""; 
       
-      // ++ MODIFIED: Reset guess state for the new round
       this.pendingGuess = null;
       this.confirmedGuess = null;
 
@@ -435,21 +438,44 @@ document.addEventListener("DOMContentLoaded", () => {
         }, this.fadeTimerDuration * 1000);
     }
 
+    // ++ MODIFIED: This function now handles both scenarios (with and without a guess).
     handleTimeout() {
         this.stopAllTimers();
+        if (!this.canGuess) return; // Prevent multiple triggers
         this.canGuess = false;
-        this.elements.trackNameDisplay.textContent = this.currentTrack.name || "Unknown Location";
-        alert("Time's up!");
 
-        // ++ MODIFIED: Instead of drawing here, set state and let updateMarkerPositions handle it
-        this.pendingGuess = null; // Hide the temp guess marker
-        this.confirmedGuess = { x: -1000, y: -1000 }; // Use a dummy confirmed guess to show only the answer
-        this.elements.markerPlayer.hidden = true; // Explicitly hide player marker
-        this.updateMarkerPositions();
+        this.elements.trackNameDisplay.textContent = this.currentTrack.name || "Unknown Location";
+        this.elements.trackWrapper.classList.remove('faded-out');
         
-        this.score += 0;
-        this.elements.scoreDisplay.textContent = `Score: ${this.score}`;
-        this.elements.resultText.textContent = "Time's up! +0 pts";
+        // Scenario 1: Player had a guess placed when time ran out
+        if (this.pendingGuess) {
+            alert("Time's up! Your guess has been automatically confirmed.");
+            this.confirmedGuess = this.pendingGuess;
+            this.pendingGuess = null;
+
+            const answerX = this.transformX(this.currentTrack.mapX);
+            const answerY = this.currentTrack.mapY;
+            const dx = this.confirmedGuess.x - answerX;
+            const dy = this.confirmedGuess.y - answerY;
+            const distance = Math.hypot(dx, dy);
+            let points = 0;
+            if (distance <= 15) points = 200;
+            else if (distance <= 200) points = Math.round(200 - distance);
+            
+            this.score += points;
+            this.elements.scoreDisplay.textContent = `Score: ${this.score}`;
+            this.elements.resultText.textContent = `Distance: ${Math.round(distance)}px | +${points} pts`;
+
+        // Scenario 2: Player did not have a guess placed
+        } else {
+            alert("Time's up! You didn't make a guess.");
+            this.confirmedGuess = null; // Ensure no player marker or line is drawn
+            this.score += 0;
+            this.elements.scoreDisplay.textContent = `Score: ${this.score}`;
+            this.elements.resultText.textContent = "Time's up! +0 pts";
+        }
+        
+        this.updateMarkerPositions();
 
         this.elements.confirmBtn.hidden = true;
         const isLastRound = this.round >= this.shuffledTracks.length - 1;
@@ -496,7 +522,6 @@ document.addEventListener("DOMContentLoaded", () => {
       this.loadRound();
     }
     
-    // ++ MODIFIED: This method now just sets the logical coordinates and redraws.
     handleMapClick(e) {
       if (!this.canGuess) return;
       const rect = this.elements.mapWrapper.getBoundingClientRect();
@@ -506,11 +531,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const guessY = (e.clientY - rect.top) / scale - offset.y;
       this.pendingGuess = { x: guessX, y: guessY };
 
-      this.updateMarkerPositions(); // Redraw the guess marker in its new spot
+      this.updateMarkerPositions();
       this.elements.confirmBtn.hidden = false;
     }
 
-    // ++ MODIFIED: This method is now much simpler.
     confirmGuess() {
       if (!this.pendingGuess || !this.canGuess) return;
       this.stopAllTimers();
@@ -520,6 +544,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       this.canGuess = false;
       this.elements.trackNameDisplay.textContent = this.currentTrack.name || "Unknown Location";
+      this.elements.trackWrapper.classList.remove('faded-out');
       
       const answerX = this.transformX(this.currentTrack.mapX);
       const answerY = this.currentTrack.mapY;
@@ -535,9 +560,9 @@ document.addEventListener("DOMContentLoaded", () => {
       
       if (this.currentImageLoadedSuccessfully && this.elements.seedInput.value.trim() === '' && !this.isPracticeMode) {
         setUsedImages([...new Set([...getUsedImages(), this.currentTrack.image])]);
+        setPracticeUnlocks([...new Set([...getPracticeUnlocks(), this.currentTrack.image])]);
       }
       
-      // Set the final state and let the update function draw everything
       this.confirmedGuess = this.pendingGuess;
       this.pendingGuess = null;
       this.updateMarkerPositions();

@@ -55,7 +55,7 @@ const TRACKS_DATA = [
   { image: "images/img52.webp", name: "Beware of Train", mapX: 881, mapY: 582, credit: "SudaiDelphi" },
   { image: "images/img53.webp", name: "The Sahara Desert?", mapX: 200, mapY: 514, credit: "SudaiDelphi" },
   { image: "images/img54.webp", name: "Don't sting me!", mapX: 852, mapY: 416, credit: "SudaiDelphi" },
-  { image: "images/img55.webp", name: "Near the Bridge", mapX: 818, mapY: 358, credit: "SudaiDelphi" },
+  { image: "images/img55.webp", name: "Near the Bridge", mapX: 870, mapY: 332, credit: "SudaiDelphi" },
   { image: "images/img56.webp", name: "Near-Track Metal", mapX: 853, mapY: 503, credit: "SudaiDelphi" },
   { image: "images/img57.webp", name: "A Lake of Goodies", mapX: 930, mapY: 142, credit: "SudaiDelphi" },
   { image: "images/img58.webp", name: "How do I get down?", mapX: 621, mapY: 1035, credit: "Crazalu" },
