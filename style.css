@@ -228,15 +228,26 @@ hr { border: 0; height: 1px; background-color: var(--leaderboard-border); margin
   opacity: 0.8;
 }
 
+/* ++ ADDED: Magnifier styles ++ */
+#magnifier {
+  position: absolute;
+  border-radius: 50%;
+  border: 3px solid var(--border-color);
+  background-repeat: no-repeat;
+  display: none;
+  pointer-events: none; /* Crucial: Allows panning clicks to go through */
+  z-index: 50;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
 @media (max-width: 800px) {
   .logo-image { max-width: 90%; }
   .menu-main, .game-main-area { flex-direction: column; }
-  /* MODIFIED: The new panel will stack correctly with this */
   .image-panel {
     width: 100%;
     margin-bottom: 10px;
   }
-  .track-wrapper { flex-basis: auto; width: 100%; margin-bottom: 0; } /* Removed margin-bottom */
+  .track-wrapper { flex-basis: auto; width: 100%; margin-bottom: 0; }
   .map-wrapper { flex-basis: auto; width: 100%; }
   .stats { font-size: 1em; }
   .btn-header { position: relative; display: block; margin: 0 auto 15px auto; top: 0; left: 0; }
@@ -244,5 +255,9 @@ hr { border: 0; height: 1px; background-color: var(--leaderboard-border); margin
   #practice-grid {
     grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
     gap: 10px;
+  }
+  /* Hide magnifier on small screens where it's not practical */
+  #magnifier {
+    display: none !important;
   }
 }

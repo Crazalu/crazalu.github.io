@@ -8,6 +8,8 @@
   <script>
     (function() {
       const THEME_KEY = 'marioKartGeoGuessr_theme';
+
+
       const savedTheme = localStorage.getItem(THEME_KEY) || 'light';
       if (savedTheme !== 'light') {
         document.documentElement.classList.add(`theme-${savedTheme}`);
@@ -105,19 +107,18 @@
     </div>
     
     <div class="game-main-area">
-      <!-- ADDED/MODIFIED: A wrapper for the image and its name -->
       <div class="image-panel">
         <div id="track-wrapper" class="interactive-area track-wrapper">
           <div id="track-container" class="interactive-area-container">
             <img id="track-image" src="" alt="Image to guess">
             <p id="track-credit"></p>
           </div>
+          <!-- ++ ADDED: The magnifier element ++ -->
+          <div id="magnifier"></div>
         </div>
-        <!-- ADDED: Element to display the track name -->
         <h3 id="track-name-display"></h3>
       </div>
       
-      <!-- MODIFIED: Markers and SVG are now outside map-container for correct positioning -->
       <div id="map-wrapper" class="interactive-area map-wrapper">
         <div id="map-container" class="interactive-area-container">
           <img id="track-map" src="map/mk_map.webp" alt="Map of all tracks">

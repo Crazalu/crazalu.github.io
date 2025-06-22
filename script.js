@@ -7,6 +7,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const MAP_WIDTH = 2004;
   const MIN_DISTANCE = 20;
 
+  const MAGNIFIER_SIZE = 150;
+  const MAGNIFICATION_LEVEL = 2.5;
+
   const getUsedImages = () => JSON.parse(localStorage.getItem(USED_IMAGES_KEY)) || [];
   const setUsedImages = (list) => localStorage.setItem(USED_IMAGES_KEY, JSON.stringify(list));
   const clearUsedImages = () => localStorage.removeItem(USED_IMAGES_KEY);
@@ -214,7 +217,6 @@ document.addEventListener("DOMContentLoaded", () => {
           y: (logicalPos.y + offset.y) * scale
       });
 
-      // Show temporary guess marker if it exists
       if (this.pendingGuess) {
           const pixelPos = getPixelPos(this.pendingGuess);
           this.elements.markerGuess.style.left = `${pixelPos.x}px`;
@@ -224,12 +226,10 @@ document.addEventListener("DOMContentLoaded", () => {
           this.elements.markerGuess.hidden = true;
       }
 
-      // Hide all results initially
       this.elements.markerPlayer.hidden = true;
       this.elements.markerAnswer.hidden = true;
       this.elements.guessLine.style.display = 'none';
 
-      // Show results if the round is over
       if (!this.canGuess) {
           const answerLogicalPos = {
               x: this.transformX(this.currentTrack.mapX),
@@ -240,7 +240,6 @@ document.addEventListener("DOMContentLoaded", () => {
           this.elements.markerAnswer.style.top = `${answerPixelPos.y}px`;
           this.elements.markerAnswer.hidden = false;
 
-          // Only show player marker and line if there was a confirmed guess
           if (this.confirmedGuess) {
               const playerPixelPos = getPixelPos(this.confirmedGuess);
               this.elements.markerPlayer.style.left = `${playerPixelPos.x}px`;
@@ -317,6 +316,71 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.modalPlayAgainBtn.addEventListener('click', () => { this.elements.endGameModal.hidden = true; this.start(); });
       this.elements.modalBackToMenuBtn.addEventListener('click', () => { this.elements.endGameModal.hidden = true; this.hideGameAndShowMenu(); });
       this.elements.saveScoreBtn.addEventListener('click', () => this.saveHighScore());
+
+      this.elements.trackWrapper.addEventListener('mousemove', this.handleMagnifierMove.bind(this));
+      this.elements.trackWrapper.addEventListener('mouseenter', this.handleMagnifierEnter.bind(this));
+      this.elements.trackWrapper.addEventListener('mouseleave', this.handleMagnifierLeave.bind(this));
+    }
+
+    // ++ MODIFIED: Check if panning is active before showing the magnifier
+    handleMagnifierEnter(e) {
+      if (this.trackPanZoom.isDown) return; // Don't show if user is panning
+
+      if (this.currentImageLoadedSuccessfully && !this.elements.trackWrapper.classList.contains('faded-out')) {
+        this.elements.magnifier.style.display = 'block';
+      }
+    }
+
+    handleMagnifierLeave(e) {
+      this.elements.magnifier.style.display = 'none';
+    }
+
+    // ++ MODIFIED: Check if panning is active before moving the magnifier
+    handleMagnifierMove(e) {
+      if (this.trackPanZoom.isDown) { // Don't move if user is panning
+          this.elements.magnifier.style.display = 'none'; // Also ensure it's hidden
+          return;
+      }
+      if (this.elements.magnifier.style.display !== 'block') return;
+
+      const { trackWrapper, trackContainer, trackImage, magnifier } = this.elements;
+      const { scale, offset } = this.trackPanZoom;
+      const rect = trackWrapper.getBoundingClientRect();
+
+      const cursorX = e.clientX - rect.left;
+      const cursorY = e.clientY - rect.top;
+
+      const imgNaturalWidth = trackImage.naturalWidth;
+      const imgNaturalHeight = trackImage.naturalHeight;
+      const containerWidth = trackContainer.clientWidth;
+      const containerHeight = trackContainer.clientHeight;
+      const imgAspectRatio = imgNaturalWidth / imgNaturalHeight;
+      const containerAspectRatio = containerWidth / containerHeight;
+      
+      let renderedImgWidth, renderedImgHeight, xOffset = 0, yOffset = 0;
+      if (imgAspectRatio > containerAspectRatio) {
+        renderedImgHeight = containerHeight;
+        renderedImgWidth = renderedImgHeight * imgAspectRatio;
+        xOffset = (containerWidth - renderedImgWidth) / 2;
+      } else {
+        renderedImgWidth = containerWidth;
+        renderedImgHeight = renderedImgWidth / imgAspectRatio;
+        yOffset = (containerHeight - renderedImgHeight) / 2;
+      }
+
+      magnifier.style.left = `${cursorX - MAGNIFIER_SIZE / 2}px`;
+      magnifier.style.top = `${cursorY - MAGNIFIER_SIZE / 2}px`;
+
+      const cursorOnPannedContentX = (cursorX / scale) - offset.x;
+      const cursorOnPannedContentY = (cursorY / scale) - offset.y;
+      
+      const logicalX = cursorOnPannedContentX - xOffset;
+      const logicalY = cursorOnPannedContentY - yOffset;
+      
+      const bgPosX = -logicalX * MAGNIFICATION_LEVEL + (MAGNIFIER_SIZE / 2);
+      const bgPosY = -logicalY * MAGNIFICATION_LEVEL + (MAGNIFIER_SIZE / 2);
+
+      magnifier.style.backgroundPosition = `${bgPosX}px ${bgPosY}px`;
     }
     
     startPracticeRound(track) {
@@ -390,12 +454,36 @@ document.addEventListener("DOMContentLoaded", () => {
       this.updateMarkerPositions();
       this.startRoundTimer();
       this.startImageFadeTimer();
+
+      const { magnifier, trackImage, trackContainer } = this.elements;
+      magnifier.style.backgroundImage = `url('${trackImage.src}')`;
+      magnifier.style.width = `${MAGNIFIER_SIZE}px`;
+      magnifier.style.height = `${MAGNIFIER_SIZE}px`;
+
+      const imgNaturalWidth = trackImage.naturalWidth;
+      const imgNaturalHeight = trackImage.naturalHeight;
+      const containerWidth = trackContainer.clientWidth;
+      const containerHeight = trackContainer.clientHeight;
+      const imgAspectRatio = imgNaturalWidth / imgNaturalHeight;
+      const containerAspectRatio = containerWidth / containerHeight;
+      
+      let renderedImgWidth, renderedImgHeight;
+      if (imgAspectRatio > containerAspectRatio) {
+        renderedImgHeight = containerHeight;
+        renderedImgWidth = renderedImgHeight * imgAspectRatio;
+      } else {
+        renderedImgWidth = containerWidth;
+        renderedImgHeight = renderedImgWidth / imgAspectRatio;
+      }
+      
+      magnifier.style.backgroundSize = `${renderedImgWidth * MAGNIFICATION_LEVEL}px ${renderedImgHeight * MAGNIFICATION_LEVEL}px`;
     }
     
     loadRound() {
       clearTimeout(this.imageFadeTimer);
       this.elements.trackWrapper.classList.remove('faded-out');
       this.elements.trackNameDisplay.textContent = ""; 
+      this.elements.magnifier.style.display = 'none';
       
       this.pendingGuess = null;
       this.confirmedGuess = null;
@@ -435,19 +523,19 @@ document.addEventListener("DOMContentLoaded", () => {
         
         this.imageFadeTimer = setTimeout(() => {
             this.elements.trackWrapper.classList.add('faded-out');
+            this.elements.magnifier.style.display = 'none';
         }, this.fadeTimerDuration * 1000);
     }
 
-    // ++ MODIFIED: This function now handles both scenarios (with and without a guess).
     handleTimeout() {
         this.stopAllTimers();
-        if (!this.canGuess) return; // Prevent multiple triggers
+        if (!this.canGuess) return;
         this.canGuess = false;
 
         this.elements.trackNameDisplay.textContent = this.currentTrack.name || "Unknown Location";
         this.elements.trackWrapper.classList.remove('faded-out');
+        this.elements.magnifier.style.display = 'none';
         
-        // Scenario 1: Player had a guess placed when time ran out
         if (this.pendingGuess) {
             alert("Time's up! Your guess has been automatically confirmed.");
             this.confirmedGuess = this.pendingGuess;
@@ -466,10 +554,9 @@ document.addEventListener("DOMContentLoaded", () => {
             this.elements.scoreDisplay.textContent = `Score: ${this.score}`;
             this.elements.resultText.textContent = `Distance: ${Math.round(distance)}px | +${points} pts`;
 
-        // Scenario 2: Player did not have a guess placed
         } else {
             alert("Time's up! You didn't make a guess.");
-            this.confirmedGuess = null; // Ensure no player marker or line is drawn
+            this.confirmedGuess = null;
             this.score += 0;
             this.elements.scoreDisplay.textContent = `Score: ${this.score}`;
             this.elements.resultText.textContent = "Time's up! +0 pts";
@@ -545,6 +632,7 @@ document.addEventListener("DOMContentLoaded", () => {
       this.canGuess = false;
       this.elements.trackNameDisplay.textContent = this.currentTrack.name || "Unknown Location";
       this.elements.trackWrapper.classList.remove('faded-out');
+      this.elements.magnifier.style.display = 'none';
       
       const answerX = this.transformX(this.currentTrack.mapX);
       const answerY = this.currentTrack.mapY;
@@ -705,6 +793,7 @@ document.addEventListener("DOMContentLoaded", () => {
     fadeTimerInput: document.getElementById('fade-timer-input'),
     fadeTimerCheckbox: document.getElementById('fade-timer-checkbox'),
     endGameBtn: document.getElementById('end-game-btn'),
+    magnifier: document.getElementById('magnifier'),
   };
   
   new Game(elements);

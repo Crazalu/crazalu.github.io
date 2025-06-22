@@ -27,7 +27,7 @@ const TRACKS_DATA = [
   { image: "images/img24.webp", name: "Get out my boots", mapX: 109,  mapY: 782, credit: "SudaiDelphi" },
   { image: "images/img25.webp", name: "Wndr o' the Wrld?", mapX: 102,  mapY: 813, credit: "SudaiDelphi" },
   { image: "images/img26.webp", name: "Classic Standoff", mapX: 34,   mapY: 817, credit: "SudaiDelphi" },
-  { image: "images/img27.webp", name: "Glidin' 2 Sandy Shores", mapX: 34,   mapY: 738, credit: "SudaiDelphi" },
+  { image: "images/img27.webp", name: "Glidin' 2 Sandy Shores", mapX: 13,   mapY: 738, credit: "SudaiDelphi" },
   { image: "images/img28.webp", name: "Going On A Hike", mapX: 486,  mapY: 915, credit: "SudaiDelphi" },
   { image: "images/img29.webp", name: "Apocalypse", mapX: 349,  mapY: 364, credit: "SudaiDelphi" },
   { image: "images/img30.webp", name: "Beware: Danger!", mapX: 435,  mapY: 837, credit: "SudaiDelphi" },
