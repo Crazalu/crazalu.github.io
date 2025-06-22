@@ -60,5 +60,6 @@ const TRACKS_DATA = [
   { image: "images/img57.webp", name: "A Lake of Goodies", mapX: 930, mapY: 142, credit: "SudaiDelphi" },
   { image: "images/img58.webp", name: "How do I get down?", mapX: 621, mapY: 1035, credit: "Crazalu" },
   { image: "images/img59.webp", name: "The Fountain of Youth", mapX: 1859, mapY: 773, credit: "Crazalu" },
-  { image: "images/img60.webp", name: "Does she know, chat?", mapX: 1288, mapY: 127, credit: "Crazalu" }
+  { image: "images/img60.webp", name: "Does she know, chat?", mapX: 1288, mapY: 127, credit: "Crazalu" },
+  { image: "images/img61.webp", name: "Waterfall Fall", mapX: 1360, mapY: 743, credit: "Electric_Hoodie" }
 ];

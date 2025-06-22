@@ -14,7 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const MODE_OPTION_TRACK_KEY = 'marioKartGeoGuessr_modeOption_track';
   const MODE_OPTION_MAP_KEY = 'marioKartGeoGuessr_modeOption_map';
   const MODE_OPTION_SITE_KEY = 'marioKartGeoGuessr_modeOption_site';
-  const SHOW_FADE_TIMER_KEY = 'marioKartGeoGuessr_showFadeTimer'; // ++ ADDED: Key for new setting
+  const SHOW_FADE_TIMER_KEY = 'marioKartGeoGuessr_showFadeTimer';
 
   const getUsedImages = () => JSON.parse(localStorage.getItem(USED_IMAGES_KEY)) || [];
   const setUsedImages = (list) => localStorage.setItem(USED_IMAGES_KEY, JSON.stringify(list));
@@ -211,6 +211,8 @@ document.addEventListener("DOMContentLoaded", () => {
       this.isInvertedTrack = false;
       this.isInvertedMap = false;
       this.isInvertedSite = false;
+      this.isRerunGame = false;
+      this.isRandomizedPerRound = false;
 
       this.isPracticeMode = false;
       this.currentImageLoadedSuccessfully = false;
@@ -222,7 +224,7 @@ document.addEventListener("DOMContentLoaded", () => {
       this.isFadeTimerEnabled = false;
       this.fadeTimerDuration = 10;
       this.imageFadeTimer = null;
-      this.fadeDisplayInterval = null; // ++ ADDED: Interval for fade timer display
+      this.fadeDisplayInterval = null;
     }
 
     updateMarkerPositions() {
@@ -325,14 +327,7 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.nextBtn.addEventListener('click', () => this.nextRound());
       this.elements.confirmBtn.addEventListener('click', () => this.confirmGuess());
       this.elements.endGameBtn.addEventListener('click', () => this.showFinalResults());
-      this.elements.resetUsedBtn.addEventListener('click', () => { 
-        if (confirm("Are you sure? This will reset your seen images history for the main game. Your practice mode unlocks will NOT be affected.")) { 
-          clearUsedImages(); 
-          this.updateStatusText(); 
-          this.populatePracticeGrid();
-          alert("Seen images for the game cycle have been reset!"); 
-        } 
-      });
+      // No reset button to bind
       this.elements.backToMenuBtn.addEventListener('click', () => { if (confirm("Are you sure you want to quit? Your score will not be saved.")) { this.hideGameAndShowMenu(); } });
       
       this.elements.modalPlayAgainBtn.addEventListener('click', () => {
@@ -437,24 +432,22 @@ document.addEventListener("DOMContentLoaded", () => {
       this._startGameWithSettings({ isPractice: false });
     }
     
-    startRandomizedGame() {
+    _randomizeCurrentSettings() {
       const { 
         randModeMirror, randModeInverted,
         randMirrorTrack, randMirrorMap, randMirrorSite,
         randInvertedTrack, randInvertedMap, randInvertedSite,
         randTimerEnable, randTimerMin, randTimerMax,
-        randFadeEnable, randFadeMin, randFadeMax,
-        randomizerModal
+        randFadeEnable, randFadeMin, randFadeMax
       } = this.elements;
 
-      // Build modifier pools for each component. A pool can contain 'normal', 'mirror', 'inverted', or 'both'.
       const buildModifierPool = (isMirror, isMirrorChecked, isInverted, isInvertedChecked) => {
         const pool = ['normal'];
         if (isMirror && isMirrorChecked) pool.push('mirror');
         if (isInverted && isInvertedChecked) pool.push('inverted');
-        if (isMirror && isMirrorChecked && isInverted && isInvertedChecked) pool.push('both'); // Allow combined effect
+        if (isMirror && isMirrorChecked && isInverted && isInvertedChecked) pool.push('both');
         return pool;
-      }
+      };
 
       const trackModifiers = buildModifierPool(randModeMirror.checked, randMirrorTrack.checked, randModeInverted.checked, randInvertedTrack.checked);
       const mapModifiers = buildModifierPool(randModeMirror.checked, randMirrorMap.checked, randModeInverted.checked, randInvertedMap.checked);
@@ -488,6 +481,25 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         this.isFadeTimerEnabled = false;
       }
+    }
+    
+    startRandomizedGame() {
+      const { 
+        randModeMirror, randModeInverted,
+        randTimerEnable, // ++ CORRECTED: The typo is fixed here ++
+        randFadeEnable, randomizerModal, randPerRound 
+      } = this.elements;
+
+      if (!randModeMirror.checked && !randModeInverted.checked && !randTimerEnable.checked && !randFadeEnable.checked) {
+          alert('You must select at least one option to randomize!');
+          return;
+      }
+
+      this.isRandomizedPerRound = randPerRound.checked;
+      
+      if (!this.isRandomizedPerRound) {
+        this._randomizeCurrentSettings();
+      }
 
       randomizerModal.hidden = true;
       this.isPracticeMode = false;
@@ -509,23 +521,40 @@ document.addEventListener("DOMContentLoaded", () => {
         this.isFadeTimerEnabled = this.elements.fadeTimerCheckbox.checked;
         const fadeDuration = parseInt(this.elements.fadeTimerInput.value, 10);
         this.fadeTimerDuration = !isNaN(fadeDuration) && fadeDuration >= 1 ? fadeDuration : 10;
+        
+        this.isRandomizedPerRound = false;
     }
     
     _startGameWithSettings(options) {
+      this.isRerunGame = false;
       this.seedWasModified = false;
+
+      let availableTracks;
 
       if (options.isPractice) {
         this.shuffledTracks = [options.practiceTrack];
       } else {
         const seedVal = this.elements.seedInput.value.trim();
-        this.gameSeed = seedVal !== '' ? seedVal : Math.floor(Math.random() * 100000);
         const isSeededGame = seedVal !== '';
+        this.gameSeed = seedVal || Math.floor(Math.random() * 100000);
+        
         const enabledTracks = TRACKS_DATA.filter(t => t.enabled !== false);
-        let availableTracks = isSeededGame ? enabledTracks : enabledTracks.filter(track => !getUsedImages().includes(track.image));
-        if (!isSeededGame && availableTracks.length < MAX_ROUNDS) {
-          if (getUsedImages().length > 0) alert("Not enough new images. Resetting the cycle for you!");
-          clearUsedImages(); this.updateStatusText(); availableTracks = enabledTracks;
+
+        if (isSeededGame) {
+          availableTracks = enabledTracks;
+        } else {
+          availableTracks = enabledTracks.filter(track => !getUsedImages().includes(track.image));
+          if (availableTracks.length < MAX_ROUNDS) {
+            const confirmed = confirm("You've seen all available images! Do you want to play again with the same images?\n\n(High scores will be disabled for this session.)");
+            if (confirmed) {
+              this.isRerunGame = true;
+              availableTracks = enabledTracks;
+            } else {
+              return;
+            }
+          }
         }
+        
         if (availableTracks.length === 0) { alert("Error: No images are available to play."); return; }
         
         const fullyShuffled = seededShuffle(availableTracks, this.gameSeed);
@@ -543,8 +572,30 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.menu.hidden = true;
       this.elements.gameUI.hidden = false;
       
-      this.applyInGameEffects();
       this.loadRound();
+    }
+
+    _updateActiveSettingsDisplay() {
+        let parts = [];
+        
+        const mirrorParts = [];
+        if (this.isMirrorTrack) mirrorParts.push('Track');
+        if (this.isMirrorMap) mirrorParts.push('Map');
+        if (this.isMirrorSite) mirrorParts.push('Site');
+        parts.push(`Mirror: ${mirrorParts.length > 0 ? mirrorParts.join(', ') : 'None'}`);
+
+        const invertedParts = [];
+        if (this.isInvertedTrack) invertedParts.push('Track');
+        if (this.isInvertedMap) invertedParts.push('Map');
+        if (this.isInvertedSite) invertedParts.push('Site');
+        parts.push(`Invert: ${invertedParts.length > 0 ? invertedParts.join(', ') : 'None'}`);
+
+        const timerParts = [];
+        if (this.isTimerEnabled) timerParts.push(`Round (${this.timerDuration}s)`);
+        if (this.isFadeTimerEnabled) timerParts.push(`Fade (${this.fadeTimerDuration}s)`);
+        parts.push(`Timers: ${timerParts.length > 0 ? timerParts.join(', ') : 'Off'}`);
+
+        this.elements.activeSettingsDisplay.textContent = `Active Settings: ${parts.join(' | ')}`;
     }
 
     applyInGameEffects() {
@@ -612,12 +663,18 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     
     loadRound() {
+      if (this.isRandomizedPerRound) {
+        this._randomizeCurrentSettings();
+      }
+      this.applyInGameEffects();
+      this._updateActiveSettingsDisplay();
+
       clearTimeout(this.imageFadeTimer);
-      clearInterval(this.fadeDisplayInterval); // ++ ADDED: Clear fade display timer
+      clearInterval(this.fadeDisplayInterval);
       this.elements.trackWrapper.classList.remove('faded-out');
       this.elements.trackNameDisplay.textContent = ""; 
       this.elements.magnifier.style.display = 'none';
-      this.elements.fadeTimerDisplay.hidden = true; // Hide display on new round
+      this.elements.fadeTimerDisplay.hidden = true;
       
       this.pendingGuess = null;
       this.confirmedGuess = null;
@@ -651,7 +708,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }, 1000);
     }
     
-    // ++ MODIFIED: This function now also handles the countdown display
     startImageFadeTimer() {
         clearTimeout(this.imageFadeTimer);
         clearInterval(this.fadeDisplayInterval);
@@ -826,7 +882,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
     
-    // ++ MODIFIED: Cleanup now includes the new fade display interval ++
     stopAllTimers() {
         clearInterval(this.roundTimer);
         clearTimeout(this.imageFadeTimer);
@@ -882,7 +937,7 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.endGameModal.hidden = false;
     }
     isHighScore(score) {
-      if (score === 0 || this.isPracticeMode) return false;
+      if (score === 0 || this.isPracticeMode || this.isRerunGame) return false;
       const scores = getLeaderboard();
       const lowestScore = scores.length > 0 ? scores[scores.length - 1].score : 0;
       return score > lowestScore || scores.length < LEADERBOARD_MAX_ENTRIES;
@@ -937,7 +992,7 @@ document.addEventListener("DOMContentLoaded", () => {
     markerAnswer: document.getElementById("marker-answer"),
     guessLine: document.getElementById("guess-line"), 
     statusText: document.getElementById("used-images-status"), 
-    resetUsedBtn: document.getElementById("reset-used-btn"),
+    // resetUsedBtn: document.getElementById("reset-used-btn"), // Button is removed
     leaderboardList: document.getElementById("leaderboard-list"), 
     backToMenuBtn: document.getElementById("back-to-menu-btn"),
     endGameModal: document.getElementById("end-game-modal"), 
@@ -986,9 +1041,11 @@ document.addEventListener("DOMContentLoaded", () => {
     randFadeEnable: document.getElementById('rand-fade-enable'),
     randFadeMin: document.getElementById('rand-fade-min'),
     randFadeMax: document.getElementById('rand-fade-max'),
-    // ++ ADDED: New elements for fade timer display
     showFadeTimerCheckbox: document.getElementById('show-fade-timer-checkbox'),
     fadeTimerDisplay: document.getElementById('fade-timer-display'),
+    activeSettingsDisplay: document.getElementById('active-settings-display'), // ++ CORRECTED: Added element to object
+    randPerGame: document.getElementById('rand-per-game'),
+    randPerRound: document.getElementById('rand-per-round'),
   };
   
   new Game(elements);
@@ -1005,13 +1062,11 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   elements.fadeTimerCheckbox.dispatchEvent(new Event('change'));
 
-  // ++ ADDED: Logic for the new "Show Fade Timer" checkbox ++
   elements.showFadeTimerCheckbox.addEventListener('change', (e) => {
     localStorage.setItem(SHOW_FADE_TIMER_KEY, e.target.checked);
   });
   function loadShowFadeTimerSetting() {
     const saved = localStorage.getItem(SHOW_FADE_TIMER_KEY);
-    // Default to true if no setting is saved
     elements.showFadeTimerCheckbox.checked = saved !== 'false';
   }
 
@@ -1160,6 +1215,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   
   elements.resetRandomBtn.addEventListener('click', () => {
+    elements.randPerGame.checked = true;
     elements.randModeMirror.checked = true;
     elements.randModeInverted.checked = true;
     elements.randMirrorTrack.checked = true;
@@ -1178,5 +1234,4 @@ document.addEventListener("DOMContentLoaded", () => {
     elements.randTimerEnable.dispatchEvent(new Event('change'));
     elements.randFadeEnable.dispatchEvent(new Event('change'));
   });
-
 });

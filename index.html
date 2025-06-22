@@ -87,7 +87,6 @@
             <input type="checkbox" id="fade-timer-checkbox">
             <label for="fade-timer-checkbox">Enable</label>
           </div>
-           <!-- ++ ADDED: Toggle for showing the fade countdown ++ -->
            <div class="checkbox-wrapper">
             <input type="checkbox" id="show-fade-timer-checkbox" checked>
             <label for="show-fade-timer-checkbox">Show Fade Timer</label>
@@ -125,7 +124,6 @@
     </div>
     <div class="menu-footer">
       <p id="used-images-status"></p>
-      <button id="reset-used-btn" class="btn-secondary">Reset Seen Images</button>
     </div>
   </div>
 
@@ -136,10 +134,10 @@
       <div class="stats">
         <p id="round-display">Round 1 / 5</p>
         <p id="timer-display">Time: --</p>
-        <!-- ++ ADDED: The in-game display for the fade countdown ++ -->
         <p id="fade-timer-display" hidden>Fade in: --</p>
         <p id="score-display">Score: 0</p>
       </div>
+      <p id="active-settings-display"></p>
     </div>
     
     <div class="game-main-area">
@@ -196,6 +194,21 @@
     <div class="modal-content">
       <h2>Randomizer Settings</h2>
       <p>Choose which settings to include in the randomization pool.</p>
+
+      <!-- ++ CORRECTED: The missing "Frequency" section is now here ++ -->
+      <div class="randomizer-section">
+        <h3>Frequency</h3>
+        <div class="mode-options-group">
+            <div class="checkbox-wrapper">
+                <input type="radio" id="rand-per-game" name="rand-frequency" value="game" checked>
+                <label for="rand-per-game">Per Game</label>
+            </div>
+            <div class="checkbox-wrapper">
+                <input type="radio" id="rand-per-round" name="rand-frequency" value="round">
+                <label for="rand-per-round">Per Round</label>
+            </div>
+        </div>
+      </div>
 
       <div class="randomizer-section">
         <h3>Modes to Include</h3>

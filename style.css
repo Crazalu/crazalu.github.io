@@ -97,6 +97,15 @@ body.menu-active #menu {
 .game-header { position: relative; margin-bottom: 20px; }
 .stats { display: flex; justify-content: space-around; font-size: 1.2em; font-weight: bold; }
 .stats p { margin: 0; }
+/* ++ ADDED: Style for the active settings display ++ */
+#active-settings-display {
+  font-size: 0.9em;
+  font-style: italic;
+  color: #555;
+  margin-top: 10px;
+  min-height: 1.2em;
+}
+
 .interactive-area { width: 100%; overflow: hidden; border: 3px solid var(--border-color); border-radius: var(--border-radius); margin: 0; position: relative; background-color: #000; }
 .game-main-area { display: flex; gap: 20px; align-items: flex-start; }
 
@@ -179,7 +188,6 @@ input[type="text"], input[type="number"], select { padding: 8px; margin: 0 5px 1
 }
 
 .stats .low-time { color: #e74c3c; font-weight: bold; }
-/* ++ ADDED: Style for the new fade timer display ++ */
 #fade-timer-display { color: #2980b9; }
 
 hr { border: 0; height: 1px; background-color: var(--leaderboard-border); margin: 2em 0; }
