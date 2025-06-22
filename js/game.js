@@ -84,10 +84,17 @@ class Game {
 
     updateMarkerPositions() {
       const { scale, offset } = this.mapPanZoom;
-      const getPixelPos = (logicalPos) => ({
-          x: (logicalPos.x + offset.x) * scale,
-          y: (logicalPos.y + offset.y) * scale
-      });
+      const getPixelPos = (logicalPos) => {
+        const isMapVisuallyFlipped = this.isMirrorMap ^ this.isMirrorSite;
+        let displayX = logicalPos.x;
+        if (isMapVisuallyFlipped) {
+            displayX = MAP_WIDTH - displayX;
+        }
+        return {
+            x: (displayX + offset.x) * scale,
+            y: (logicalPos.y + offset.y) * scale
+        };
+      };
 
       if (this.pendingGuess) {
           const pixelPos = getPixelPos(this.pendingGuess);
@@ -103,15 +110,9 @@ class Game {
       this.elements.guessLine.style.display = 'none';
 
       if (!this.canGuess) {
-          let answerX = this.currentTrack.mapX;
-          if (this.isMirrorMap) {
-              answerX = (MAP_WIDTH - 1) - answerX;
-          }
-          const answerLogicalPos = {
-              x: answerX,
-              y: this.currentTrack.mapY
-          };
+          const answerLogicalPos = { x: this.currentTrack.mapX, y: this.currentTrack.mapY };
           const answerPixelPos = getPixelPos(answerLogicalPos);
+          
           this.elements.markerAnswer.style.left = `${answerPixelPos.x}px`;
           this.elements.markerAnswer.style.top = `${answerPixelPos.y}px`;
           this.elements.markerAnswer.hidden = false;
@@ -201,16 +202,33 @@ class Game {
     handleMagnifierLeave(e) {
       this.elements.magnifier.style.display = 'none';
     }
-
+    
     handleMagnifierMove(e) {
       if (this.isImageInteraction || this.isFragmentedMode) return;
       if (this.elements.magnifier.style.display !== 'block') return;
-
+  
       const { trackWrapper, trackContainer, trackImage, magnifier } = this.elements;
       const rect = trackWrapper.getBoundingClientRect();
+      
       const cursorX = e.clientX - rect.left;
       const cursorY = e.clientY - rect.top;
-
+  
+      if (this.isMirrorSite) {
+          magnifier.style.right = `${cursorX - MAGNIFIER_SIZE / 2}px`;
+          magnifier.style.left = 'auto';
+      } else {
+          magnifier.style.left = `${cursorX - MAGNIFIER_SIZE / 2}px`;
+          magnifier.style.right = 'auto';
+      }
+      magnifier.style.top = `${cursorY - MAGNIFIER_SIZE / 2}px`;
+  
+      const isTrackVisuallyFlipped = this.isMirrorTrack ^ this.isMirrorSite;
+  
+      let logicalCursorX = cursorX;
+      if (isTrackVisuallyFlipped) {
+        logicalCursorX = trackWrapper.clientWidth - cursorX;
+      }
+  
       const imgNaturalWidth = trackImage.naturalWidth;
       const imgNaturalHeight = trackImage.naturalHeight;
       const containerWidth = trackContainer.clientWidth;
@@ -226,16 +244,13 @@ class Game {
         const renderedImgHeight = containerWidth / imgAspectRatio;
         yOffset = (containerHeight - renderedImgHeight) / 2;
       }
-
-      magnifier.style.left = `${cursorX - MAGNIFIER_SIZE / 2}px`;
-      magnifier.style.top = `${cursorY - MAGNIFIER_SIZE / 2}px`;
-
-      const logicalX = cursorX - xOffset;
-      const logicalY = cursorY - yOffset;
       
-      const bgPosX = -logicalX * MAGNIFICATION_LEVEL + (MAGNIFIER_SIZE / 2);
-      const bgPosY = -logicalY * MAGNIFICATION_LEVEL + (MAGNIFIER_SIZE / 2);
-
+      const bgCalcX = logicalCursorX - xOffset;
+      const bgCalcY = cursorY - yOffset;
+      
+      const bgPosX = -bgCalcX * MAGNIFICATION_LEVEL + (MAGNIFIER_SIZE / 2);
+      const bgPosY = -bgCalcY * MAGNIFICATION_LEVEL + (MAGNIFIER_SIZE / 2);
+  
       magnifier.style.backgroundPosition = `${bgPosX}px ${bgPosY}px`;
     }
     
@@ -314,9 +329,19 @@ class Game {
         if (randModeInverted.checked) modePool.push('inverted');
         if (modePool.length > 0) this.gameMode = modePool[Math.floor(Math.random() * modePool.length)];
 
-        const trackModifiers = buildModifierPool(randModeMirror.checked, randMirrorTrack.checked, randModeInverted.checked, randInvertedTrack.checked);
-        const mapModifiers = buildModifierPool(randModeMirror.checked, randMirrorMap.checked, randModeInverted.checked, randInvertedMap.checked);
-        const siteModifiers = buildModifierPool(randModeMirror.checked, randMirrorSite.checked, randModeInverted.checked, randInvertedSite.checked);
+        let mTrack = randMirrorTrack.checked;
+        let mMap = randMirrorMap.checked;
+        let mSite = randMirrorSite.checked;
+        if (mSite) { mTrack = true; mMap = true; }
+
+        let iTrack = randInvertedTrack.checked;
+        let iMap = randInvertedMap.checked;
+        let iSite = randInvertedSite.checked;
+        if (iSite) { iTrack = true; iMap = true; }
+
+        const trackModifiers = buildModifierPool(randModeMirror.checked, mTrack, randModeInverted.checked, iTrack);
+        const mapModifiers = buildModifierPool(randModeMirror.checked, mMap, randModeInverted.checked, iMap);
+        const siteModifiers = buildModifierPool(randModeMirror.checked, mSite, randModeInverted.checked, iSite);
 
         const randomTrack = trackModifiers[Math.floor(Math.random() * trackModifiers.length)];
         const randomMap = mapModifiers[Math.floor(Math.random() * mapModifiers.length)];
@@ -351,16 +376,25 @@ class Game {
     
     startRandomizedGame() {
       const { 
-        randModeMirror, randModeInverted, randModeFragmented,
-        randTimerEnable, randFadeEnable, randomizerModal, randPerRound 
+        randModeMirror, randMirrorSite, 
+        randModeInverted, randModeFragmented, 
+        randTimerEnable, randFadeEnable, randomizerModal
       } = this.elements;
 
       if (!randModeMirror.checked && !randModeInverted.checked && !randModeFragmented.checked && !randTimerEnable.checked && !randFadeEnable.checked) {
           alert('You must select at least one option to randomize!');
           return;
       }
+      
+      // Warn the user ONLY if the buggy "Mirror Site" option is included
+      if (randModeMirror.checked && randMirrorSite.checked) {
+          const confirmed = confirm("Warning: The 'Mirror Site' option is experimental and has bugs that may affect gameplay. There are no plans to fix this issue as it is only available in the randomizer. Continue anyway?");
+          if (!confirmed) {
+              return; // Do not start the game if they cancel
+          }
+      }
 
-      this.isRandomizedPerRound = randPerRound.checked;
+      this.isRandomizedPerRound = this.elements.randPerRound.checked;
       
       if (!this.isRandomizedPerRound) {
         this._randomizeCurrentSettings();
@@ -374,8 +408,6 @@ class Game {
     setupGameSettings() {
         this.gameMode = this.elements.modeSelector.value;
         this.isFragmentedMode = this.gameMode === 'fragmented';
-
-        // Reset all effects before setting them based on mode
         this.isMirrorTrack = false; this.isMirrorMap = false; this.isMirrorSite = false;
         this.isInvertedTrack = false; this.isInvertedMap = false; this.isInvertedSite = false;
 
@@ -383,13 +415,14 @@ class Game {
           this.fragmentCost = parseInt(this.elements.fragmentCost.value, 10) || 20;
           this.fragmentGrid = this.elements.fragmentGridSize.value;
           this.fragmentInitialReveals = parseInt(this.elements.fragmentInitialReveals.value, 10) || 1;
-        } else {
-          this.isMirrorTrack = (this.gameMode === 'mirror' && this.elements.modeOptionTrack.checked);
-          this.isMirrorMap = (this.gameMode === 'mirror' && this.elements.modeOptionMap.checked);
-          this.isMirrorSite = (this.gameMode === 'mirror' && this.elements.modeOptionSite.checked);
-          this.isInvertedTrack = (this.gameMode === 'inverted' && this.elements.modeOptionTrack.checked);
-          this.isInvertedMap = (this.gameMode === 'inverted' && this.elements.modeOptionMap.checked);
-          this.isInvertedSite = (this.gameMode === 'inverted' && this.elements.modeOptionSite.checked);
+        } else if (this.gameMode === 'mirror') {
+          this.isMirrorTrack = this.elements.modeOptionTrack.checked;
+          this.isMirrorMap = this.elements.modeOptionMap.checked;
+          this.isMirrorSite = false; // Cannot be selected from standard UI
+        } else if (this.gameMode === 'inverted') {
+          this.isInvertedTrack = this.elements.modeOptionTrack.checked;
+          this.isInvertedMap = this.elements.modeOptionMap.checked;
+          this.isInvertedSite = this.elements.modeOptionSite.checked;
         }
         
         this.isTimerEnabled = !this.elements.unlimitedTimeCheckbox.checked;
@@ -483,26 +516,20 @@ class Game {
     applyInGameEffects() {
         const { trackImage, mapImage } = this.elements;
         
-        let trackTransforms = [];
-        let trackFilters = [];
-        let mapTransforms = [];
-        let mapFilters = [];
-
+        // This function now only toggles classes. CSS will handle the visual changes.
         document.body.classList.toggle('mirror-site', this.isMirrorSite);
         document.documentElement.classList.toggle('inverted-site', this.isInvertedSite);
-        
-        if (this.isMirrorTrack) trackTransforms.push('scaleX(-1)');
-        if (this.isInvertedTrack) trackFilters.push('invert(1)');
-        
-        if (this.isMirrorMap) mapTransforms.push('scaleX(-1)');
-        if (this.isInvertedMap) mapFilters.push('invert(1)');
 
-        trackImage.style.transform = trackTransforms.join(' ');
-        trackImage.style.filter = trackFilters.join(' ');
+        // Toggle mirror classes on individual elements
+        trackImage.classList.toggle('mirrored', this.isMirrorTrack);
+        mapImage.classList.toggle('mirrored', this.isMirrorMap);
+
+        // Handle invert filters directly as they don't conflict
+        trackImage.style.filter = this.isInvertedTrack ? 'invert(1)' : '';
+        mapImage.style.filter = this.isInvertedMap ? 'invert(1)' : '';
+        
+        // This is needed to counteract the site-wide invert filter
         trackImage.classList.toggle('inverted-by-js', this.isInvertedTrack || this.isInvertedSite);
-
-        mapImage.style.transform = mapTransforms.join(' ');
-        mapImage.style.filter = mapFilters.join(' ');
         mapImage.classList.toggle('inverted-by-js', this.isInvertedMap || this.isInvertedSite);
     }
     
@@ -643,12 +670,7 @@ class Game {
             this.confirmedGuess = this.pendingGuess;
             this.pendingGuess = null;
             
-            let answerX = this.currentTrack.mapX;
-            if (this.isMirrorMap) {
-                answerX = (MAP_WIDTH - 1) - answerX;
-            }
-            
-            const dx = this.confirmedGuess.x - answerX;
+            const dx = this.confirmedGuess.x - this.currentTrack.mapX;
             const dy = this.confirmedGuess.y - this.currentTrack.mapY;
             const distance = Math.hypot(dx, dy);
             let points = 200;
@@ -718,16 +740,21 @@ class Game {
     }
     
     handleMapClick(e) {
-      if (!this.canGuess) return;
-      const rect = this.elements.mapWrapper.getBoundingClientRect();
-      const { scale, offset } = this.mapPanZoom;
-
-      const guessX = (e.clientX - rect.left) / scale - offset.x;
-      const guessY = (e.clientY - rect.top) / scale - offset.y;
-      this.pendingGuess = { x: guessX, y: guessY };
-
-      this.updateMarkerPositions();
-      this.elements.confirmBtn.hidden = false;
+        if (!this.canGuess) return;
+        const rect = this.elements.mapWrapper.getBoundingClientRect();
+        const { scale, offset } = this.mapPanZoom;
+        const cursorX = e.clientX - rect.left;
+        const cursorY = e.clientY - rect.top;
+        let containerX = (cursorX / scale) - offset.x;
+        const containerY = (cursorY / scale) - offset.y;
+        const isMapVisuallyFlipped = this.isMirrorMap ^ this.isMirrorSite;
+        let logicalX = containerX;
+        if (isMapVisuallyFlipped) {
+            logicalX = MAP_WIDTH - containerX;
+        }
+        this.pendingGuess = { x: logicalX, y: containerY };
+        this.updateMarkerPositions();
+        this.elements.confirmBtn.hidden = false;
     }
 
     confirmGuess() {
@@ -744,12 +771,7 @@ class Game {
       this.elements.trackWrapper.classList.remove('faded-out');
       this.elements.magnifier.style.display = 'none';
       
-      let answerX = this.currentTrack.mapX;
-      if (this.isMirrorMap) {
-          answerX = (MAP_WIDTH - 1) - answerX;
-      }
-      
-      const dx = this.pendingGuess.x - answerX;
+      const dx = this.pendingGuess.x - this.currentTrack.mapX;
       const dy = this.pendingGuess.y - this.currentTrack.mapY;
       const distance = Math.hypot(dx, dy); let points = 200;
       if (distance > 15) points = Math.max(0, Math.round(200 - distance));
@@ -793,8 +815,10 @@ class Game {
       document.body.classList.remove('mirror-site');
       document.documentElement.classList.remove('inverted-site');
       
-      this.elements.mapImage.style.transform = 'none';
+      this.elements.mapImage.style.transform = '';
+      this.elements.mapImage.classList.remove('mirrored');
       this.elements.trackImage.style.transform = '';
+      this.elements.trackImage.classList.remove('mirrored');
       this.elements.trackImage.style.filter = '';
       this.elements.nextBtn.textContent = 'Next Round';
       this.elements.timerDisplay.hidden = false;

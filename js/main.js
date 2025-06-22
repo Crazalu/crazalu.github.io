@@ -48,6 +48,7 @@ document.addEventListener("DOMContentLoaded", () => {
     modeOptionTrack: document.getElementById('mode-option-track'),
     modeOptionMap: document.getElementById('mode-option-map'),
     modeOptionSite: document.getElementById('mode-option-site'),
+    siteOptionWrapper: document.getElementById('site-option-wrapper'), // Added this line
     resetModeBtn: document.getElementById('reset-mode-btn'),
     randomizerBtn: document.getElementById('randomizer-btn'),
     randomizerModal: document.getElementById('randomizer-modal'),
@@ -99,12 +100,7 @@ document.addEventListener("DOMContentLoaded", () => {
     startCustomGameBtn: document.getElementById('start-custom-game-btn'),
   };
   
-  // Initialize the general menu UI and its event listeners
   initializeUI(elements);
-  
-  // Create the main game instance
   const game = new Game(elements);
-
-  // Initialize the custom game creator UI, passing it the game instance
   initializeCustomGameUI(elements, game);
 });

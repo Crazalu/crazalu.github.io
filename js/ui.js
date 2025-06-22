@@ -87,14 +87,14 @@ function initializeUI(elements) {
 
   // --- Game Mode Controls ---
   function applySiteEffects() {
+      // Mirror site is no longer a standard option, so we only handle Inverted here.
       const mode = elements.modeSelector.value;
       const isSiteOptionChecked = elements.modeOptionSite.checked;
-      document.body.classList.toggle('mirror-site', mode === 'mirror' && isSiteOptionChecked);
       document.documentElement.classList.toggle('inverted-site', mode === 'inverted' && isSiteOptionChecked);
   }
 
   function handleModeOptionChange() {
-      if (elements.modeOptionSite.checked) {
+      if (elements.modeSelector.value === 'inverted' && elements.modeOptionSite.checked) {
           elements.modeOptionTrack.checked = true;
           elements.modeOptionMap.checked = true;
           elements.modeOptionTrack.disabled = true;
@@ -113,7 +113,12 @@ function initializeUI(elements) {
       const mode = elements.modeSelector.value;
       const isSpecialMode = mode === 'mirror' || mode === 'inverted';
       const isFragmented = mode === 'fragmented';
+      
       elements.modeOptionsContainer.hidden = !isSpecialMode;
+      // Show the "Site" option only if the mode is 'inverted'
+      if (elements.siteOptionWrapper) {
+          elements.siteOptionWrapper.hidden = (mode !== 'inverted');
+      }
       elements.fragmentedOptionsContainer.hidden = !isFragmented;
       elements.resetModeBtn.hidden = mode === 'normal' || mode === '';
       handleModeOptionChange();

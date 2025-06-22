@@ -26,7 +26,6 @@
   
   <link rel="stylesheet" href="style.css" />
   
-  <!-- New modular script structure -->
   <script src="data.js"></script>
   <script src="js/utils.js" defer></script>
   <script src="js/panzoom.js" defer></script>
@@ -71,7 +70,8 @@
                     <input type="checkbox" id="mode-option-map">
                     <label for="mode-option-map">Map</label>
                 </div>
-                 <div class="checkbox-wrapper">
+                 <!-- This wrapper allows JS to hide/show the "Site" option -->
+                 <div id="site-option-wrapper" class="checkbox-wrapper">
                     <input type="checkbox" id="mode-option-site">
                     <label for="mode-option-site">Site</label>
                 </div>
@@ -195,9 +195,9 @@
         <svg class="guess-line-svg">
           <line id="guess-line" x1="0" y1="0" x2="0" y2="0" />
         </svg>
-        <img id="marker-guess" class="marker" src="images/marker.png" alt="Your guess location" hidden>
-        <img id="marker-player" class="marker" src="images/marker.png" alt="Your confirmed guess" hidden>
-        <img id="marker-answer" class="marker" src="images/star.png" alt="Correct answer location" hidden>
+        <img id="marker-guess" class="marker" src="images/marker.webp" alt="Your guess location" hidden>
+        <img id="marker-player" class="marker" src="images/marker.webp" alt="Your confirmed guess" hidden>
+        <img id="marker-answer" class="marker" src="images/star.webp" alt="Correct answer location" hidden>
       </div>
     </div>
     

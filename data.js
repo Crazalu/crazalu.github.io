@@ -64,7 +64,7 @@ const TRACKS_DATA = [
   { image: "images/img61.webp", name: "Waterfall Fall", mapX: 1360, mapY: 743, credit: "Electric_Hoodie" },
   { image: "images/img62.webp", name: "Blocky (Not ? Blocks)", mapX: 1016, mapY: 227, credit: "Electric_Hoodie" },
   { image: "images/img63.webp", name: "Sail The Seven Seas", mapX: 1828, mapY: 663, credit: "Electric_Hoodie" },
-  { image: "images/img64.webp", name: "Emergency Floaty", mapX: 995, mapY: 969, credit: "Electric_Hoodie" },
+  { image: "images/img64.webp", name: "Emergency Floaty", mapX: 955, mapY: 969, credit: "Electric_Hoodie" },
   { image: "images/img65.webp", name: "Drifting On The Road", mapX: 1316, mapY: 505, credit: "Electric_Hoodie" },
   { image: "images/img66.webp", name: "Stuck in the Dark", mapX: 1182, mapY: 179, credit: "Electric_Hoodie" },
   { image: "images/img67.webp", name: "Frozen Rocks!", mapX: 1439, mapY: 417, credit: "Electric_Hoodie" },
