@@ -20,7 +20,7 @@ const TRACKS_DATA = [
   { image: "images/img17.webp", name: "Nice Shot!", mapX: 1165, mapY: 667, credit: "Crazalu" },
   { image: "images/img18.webp", name: "Water Broadcast", mapX: 1796, mapY: 841, credit: "Crazalu" },
   { image: "images/img19.webp", name: "Heating Up", mapX: 1516, mapY: 497, credit: "Crazalu" },
-  { image: "images/img20.webp", name: "Wait in Line!", mapX: 1570, mapY: 531, credit: "Crazalu" },
+  { image: "images/img20.webp", name: "Wait in Line!", mapX: 1570, mapY: 531, credit: "SudaiDelphi" },
   { image: "images/img21.webp", name: "I feel a breeze...", mapX: 1624, mapY: 772, credit: "LapisSR_" },
   { image: "images/img22.webp", name: "Thorns IV", mapX: 221,  mapY: 922, credit: "olpoker" },
   { image: "images/img23.webp", name: "Dangerous Waves", mapX: 1697, mapY: 574, credit: "Electric_Hoodie" },
@@ -56,8 +56,9 @@ const TRACKS_DATA = [
   { image: "images/img53.webp", name: "The Sahara Desert?", mapX: 200, mapY: 514, credit: "SudaiDelphi" },
   { image: "images/img54.webp", name: "Don't sting me!", mapX: 852, mapY: 416, credit: "SudaiDelphi" },
   { image: "images/img55.webp", name: "Near the Bridge", mapX: 818, mapY: 358, credit: "SudaiDelphi" },
-  { image: "images/img56.webp", name: "Img 56", mapX: 1000, mapY: 500, enabled: false, credit: "SudaiDelphi" },
-  { image: "images/img57.webp", name: "Img 57", mapX: 1000, mapY: 500, enabled: false, credit: "SudaiDelphi" },
-  { image: "images/img58.webp", name: "Img 58", mapX: 1000, mapY: 500, enabled: false, credit: "SudaiDelphi" },
-  { image: "images/img59.webp", name: "Img 59", mapX: 1000, mapY: 500, enabled: false, credit: "SudaiDelphi" }
+  { image: "images/img56.webp", name: "Near-Track Metal", mapX: 853, mapY: 503, credit: "SudaiDelphi" },
+  { image: "images/img57.webp", name: "A Lake of Goodies", mapX: 930, mapY: 142, credit: "SudaiDelphi" },
+  { image: "images/img58.webp", name: "How do I get down?", mapX: 687, mapY: 1046, credit: "Crazalu" },
+  { image: "images/img59.webp", name: "The Fountain of Youth", mapX: 1859, mapY: 773, credit: "Crazalu" },
+  { image: "images/img60.webp", name: "Does she know, chat?", mapX: 1288, mapY: 127, credit: "Crazalu" }
 ];
