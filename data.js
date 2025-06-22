@@ -38,7 +38,7 @@ const TRACKS_DATA = [
   { image: "images/img35.webp", name: "Sewer Pipes?", mapX: 288, mapY: 871, credit: "SudaiDelphi" },
   { image: "images/img36.webp", name: "They're chasing me!", mapX: 304, mapY: 386, credit: "SudaiDelphi" },
   { image: "images/img37.webp", name: "Electrifying Waters", mapX: 874, mapY: 717, credit: "SudaiDelphi" },
-  { image: "images/img38.webp", name: "Bouta Lose Reception", mapX: 388, mapY: 544, credit: "SudaiDelphi" },
+  { image: "images/img38.webp", name: "Bouta Lose Reception", mapX: 351, mapY: 601, credit: "SudaiDelphi" },
   { image: "images/img39.webp", name: "Thinkin' 'bout life.", mapX: 358, mapY: 480, credit: "SudaiDelphi" },
   { image: "images/img40.webp", name: "Too Fast! Too Fast!", mapX: 909, mapY: 219, credit: "SudaiDelphi" },
   { image: "images/img41.webp", name: "Tin Tunnel Man", mapX: 425, mapY: 363, credit: "SudaiDelphi" },
