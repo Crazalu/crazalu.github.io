@@ -34,11 +34,36 @@ function initializeUI(elements) {
       const brightness = (r * 299 + g * 587 + b * 114) / 1000;
       const textColor = brightness > 125 ? '#000000' : '#FFFFFF';
       document.documentElement.style.setProperty('--text-color', textColor);
+
+      // Set component colors based on brightness for contrast
+      const isDark = brightness <= 125;
+      if (isDark) {
+        // Dark custom theme
+        document.documentElement.style.setProperty('--modal-bg', '#1a1e25');
+        document.documentElement.style.setProperty('--leaderboard-bg', '#1a1e25');
+        document.documentElement.style.setProperty('--leaderboard-border', '#444');
+        document.documentElement.style.setProperty('--leaderboard-hover', '#3c4452');
+        document.documentElement.style.setProperty('--border-color', '#778996');
+      } else {
+        // Light custom theme
+        document.documentElement.style.setProperty('--modal-bg', '#ffffff');
+        document.documentElement.style.setProperty('--leaderboard-bg', '#ffffff');
+        document.documentElement.style.setProperty('--leaderboard-border', '#ccc');
+        document.documentElement.style.setProperty('--leaderboard-hover', '#e9ecef');
+        document.documentElement.style.setProperty('--border-color', '#444');
+      }
+
     } else {
       elements.customBgColorInput.hidden = true;
       if (theme !== 'light') {
         document.documentElement.classList.add(`theme-${theme}`);
       }
+      // Clear custom properties when switching to a built-in theme
+      document.documentElement.style.setProperty('--modal-bg', '');
+      document.documentElement.style.setProperty('--leaderboard-bg', '');
+      document.documentElement.style.setProperty('--leaderboard-border', '');
+      document.documentElement.style.setProperty('--leaderboard-hover', '');
+      document.documentElement.style.setProperty('--border-color', '');
     }
     // Re-apply inverted-site if it was active
     if (localStorage.getItem(MODE_KEY) === 'inverted' && localStorage.getItem(MODE_OPTION_SITE_KEY) === 'true') {
