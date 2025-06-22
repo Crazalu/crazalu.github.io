@@ -512,6 +512,7 @@ class Game {
       this.elements.nextBtn.hidden = true;
       this.elements.endGameBtn.hidden = true;
       this.elements.resultText.textContent = "";
+      this.elements.resultText.classList.add('hidden');
       const totalRounds = this.shuffledTracks.length;
       this.elements.roundDisplay.textContent = `Round ${this.round + 1} / ${totalRounds}`;
       const credit = this.currentTrack.credit || "Crazalu";
@@ -665,6 +666,7 @@ class Game {
             this.elements.resultText.textContent = "Time's up! +0 pts";
         }
         
+        this.elements.resultText.classList.remove('hidden');
         this.updateMarkerPositions();
 
         this.elements.confirmBtn.hidden = true;
@@ -755,6 +757,7 @@ class Game {
       
       this.elements.scoreDisplay.textContent = `Score: ${this.score}`;
       this.elements.resultText.textContent = `Distance: ${Math.round(distance)}px | +${points} pts`;
+      this.elements.resultText.classList.remove('hidden');
       
       if (this.currentImageLoadedSuccessfully && this.elements.seedInput.value.trim() === '' && !this.isPracticeMode && !this.isRerunGame) {
         setUsedImages([...new Set([...getUsedImages(), this.currentTrack.image])]);

@@ -161,6 +161,9 @@ body.menu-active #menu {
   min-width: 200px;
   box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 }
+#result.hidden {
+  visibility: hidden;
+}
 button { padding: 10px 20px; font-size: 1em; border: none; border-radius: 5px; cursor: pointer; background-color: var(--primary-button-bg); color: var(--primary-button-text); transition: background-color 0.2s; margin: 5px; }
 button:hover { background-color: #0056b3; }
 .btn-secondary { background-color: var(--secondary-button-bg); }
