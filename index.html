@@ -52,6 +52,7 @@
                     <option value="normal">Normal Mode</option>
                     <option value="mirror">Mirror Mode</option>
                     <option value="inverted">Inverted Mode</option>
+                    <option value="fragmented">Fragmented Mode</option>
                 </select>
                 <button id="reset-mode-btn" class="btn-secondary btn-small" hidden>Reset</button>
             </div>
@@ -67,6 +68,25 @@
                  <div class="checkbox-wrapper">
                     <input type="checkbox" id="mode-option-site">
                     <label for="mode-option-site">Site</label>
+                </div>
+            </div>
+            <div id="fragmented-options-container" class="mode-options-group" hidden>
+                <div class="fragment-option">
+                    <label for="fragment-cost">Reveal Cost:</label>
+                    <input type="number" id="fragment-cost" value="20" min="0" step="5">
+                </div>
+                <div class="fragment-option">
+                    <label for="fragment-grid-size">Grid:</label>
+                    <select id="fragment-grid-size">
+                        <option value="random">Random</option>
+                        <option value="2x2">2x2</option>
+                        <option value="2x3">2x3</option>
+                        <option value="3x3">3x3</option>
+                    </select>
+                </div>
+                <div class="fragment-option">
+                    <label for="fragment-initial-reveals">Initial Reveals:</label>
+                    <input type="number" id="fragment-initial-reveals" value="1" min="0">
                 </div>
             </div>
         </div>
@@ -147,6 +167,7 @@
             <img id="track-image" src="" alt="Image to guess">
             <p id="track-credit"></p>
           </div>
+          <div id="fragment-overlay"></div>
           <div id="magnifier"></div>
         </div>
         <h3 id="track-name-display"></h3>
@@ -166,6 +187,7 @@
     </div>
     
     <div class="controls">
+      <button id="reveal-fragment-btn" hidden>Reveal More (-20 pts)</button>
       <button id="confirm-btn" hidden>Confirm Guess</button>
       <p id="result"></p>
       <button id="next-btn" hidden>Next Round</button>
@@ -192,64 +214,91 @@
 
   <div id="randomizer-modal" class="modal-overlay" hidden>
     <div class="modal-content">
-      <h2>Randomizer Settings</h2>
-      <p>Choose which settings to include in the randomization pool.</p>
+      <!-- ++ ADDED: New wrapper div for scrollable content ++ -->
+      <div class="modal-body">
+        <h2>Randomizer Settings</h2>
+        <p>Choose which settings to include in the randomization pool.</p>
 
-      <!-- ++ CORRECTED: The missing "Frequency" section is now here ++ -->
-      <div class="randomizer-section">
-        <h3>Frequency</h3>
-        <div class="mode-options-group">
-            <div class="checkbox-wrapper">
-                <input type="radio" id="rand-per-game" name="rand-frequency" value="game" checked>
-                <label for="rand-per-game">Per Game</label>
-            </div>
-            <div class="checkbox-wrapper">
-                <input type="radio" id="rand-per-round" name="rand-frequency" value="round">
-                <label for="rand-per-round">Per Round</label>
-            </div>
-        </div>
-      </div>
-
-      <div class="randomizer-section">
-        <h3>Modes to Include</h3>
-        <div class="checkbox-wrapper"><input type="checkbox" id="rand-mode-mirror" checked><label for="rand-mode-mirror">Mirror</label></div>
-        <div class="checkbox-wrapper"><input type="checkbox" id="rand-mode-inverted" checked><label for="rand-mode-inverted">Inverted</label></div>
-      </div>
-
-      <div id="rand-mirror-options" class="randomizer-section">
-        <h3>Mirror Options</h3>
-        <div class="mode-options-group">
-          <div class="checkbox-wrapper"><input type="checkbox" id="rand-mirror-track" checked><label for="rand-mirror-track">Track</label></div>
-          <div class="checkbox-wrapper"><input type="checkbox" id="rand-mirror-map" checked><label for="rand-mirror-map">Map</label></div>
-          <div class="checkbox-wrapper"><input type="checkbox" id="rand-mirror-site" checked><label for="rand-mirror-site">Site</label></div>
-        </div>
-      </div>
-
-      <div id="rand-inverted-options" class="randomizer-section">
-        <h3>Inverted Options</h3>
-        <div class="mode-options-group">
-          <div class="checkbox-wrapper"><input type="checkbox" id="rand-inverted-track" checked><label for="rand-inverted-track">Track</label></div>
-          <div class="checkbox-wrapper"><input type="checkbox" id="rand-inverted-map" checked><label for="rand-inverted-map">Map</label></div>
-          <div class="checkbox-wrapper"><input type="checkbox" id="rand-inverted-site" checked><label for="rand-inverted-site">Site</label></div>
-        </div>
-      </div>
-
-      <div class="randomizer-section">
-        <h3>Timers to Include</h3>
-        <div class="timer-rand-controls">
-          <div class="checkbox-wrapper"><input type="checkbox" id="rand-timer-enable" checked><label for="rand-timer-enable">Randomize Round Timer</label></div>
-          <div class="range-inputs">
-            <input type="number" id="rand-timer-min" value="10" min="5"> to <input type="number" id="rand-timer-max" value="60" min="5"> (s)
+        <div class="randomizer-section">
+          <h3>Frequency</h3>
+          <div class="mode-options-group">
+              <div class="checkbox-wrapper">
+                  <input type="radio" id="rand-per-game" name="rand-frequency" value="game" checked>
+                  <label for="rand-per-game">Per Game</label>
+              </div>
+              <div class="checkbox-wrapper">
+                  <input type="radio" id="rand-per-round" name="rand-frequency" value="round">
+                  <label for="rand-per-round">Per Round</label>
+              </div>
           </div>
         </div>
-        <div class="timer-rand-controls">
-          <div class="checkbox-wrapper"><input type="checkbox" id="rand-fade-enable" checked><label for="rand-fade-enable">Randomize Image Fade</label></div>
-          <div class="range-inputs">
-             <input type="number" id="rand-fade-min" value="5" min="1"> to <input type="number" id="rand-fade-max" value="20" min="1"> (s)
+
+        <div class="randomizer-section">
+          <h3>Modes to Include</h3>
+          <div class="checkbox-wrapper"><input type="checkbox" id="rand-mode-mirror" checked><label for="rand-mode-mirror">Mirror</label></div>
+          <div class="checkbox-wrapper"><input type="checkbox" id="rand-mode-inverted" checked><label for="rand-mode-inverted">Inverted</label></div>
+          <div class="checkbox-wrapper"><input type="checkbox" id="rand-mode-fragmented" checked><label for="rand-mode-fragmented">Fragmented</label></div>
+        </div>
+
+        <div id="rand-mirror-options" class="randomizer-section">
+          <h3>Mirror Options</h3>
+          <div class="mode-options-group">
+            <div class="checkbox-wrapper"><input type="checkbox" id="rand-mirror-track" checked><label for="rand-mirror-track">Track</label></div>
+            <div class="checkbox-wrapper"><input type="checkbox" id="rand-mirror-map" checked><label for="rand-mirror-map">Map</label></div>
+            <div class="checkbox-wrapper"><input type="checkbox" id="rand-mirror-site" checked><label for="rand-mirror-site">Site</label></div>
+          </div>
+        </div>
+
+        <div id="rand-inverted-options" class="randomizer-section">
+          <h3>Inverted Options</h3>
+          <div class="mode-options-group">
+            <div class="checkbox-wrapper"><input type="checkbox" id="rand-inverted-track" checked><label for="rand-inverted-track">Track</label></div>
+            <div class="checkbox-wrapper"><input type="checkbox" id="rand-inverted-map" checked><label for="rand-inverted-map">Map</label></div>
+            <div class="checkbox-wrapper"><input type="checkbox" id="rand-inverted-site" checked><label for="rand-inverted-site">Site</label></div>
+          </div>
+        </div>
+
+        <div id="rand-fragmented-options" class="randomizer-section">
+          <h3>Fragmented Options</h3>
+          <div class="timer-rand-controls">
+              <div class="checkbox-wrapper"><input type="checkbox" id="rand-frag-cost-enable" checked><label for="rand-frag-cost-enable">Randomize Reveal Cost</label></div>
+              <div class="range-inputs">
+                  <input type="number" id="rand-frag-cost-min" value="10" min="0" step="5"> to <input type="number" id="rand-frag-cost-max" value="50" min="0" step="5">
+              </div>
+          </div>
+          <div class="timer-rand-controls">
+              <div class="checkbox-wrapper"><input type="checkbox" id="rand-frag-initial-enable" checked><label for="rand-frag-initial-enable">Randomize Initial Reveals</label></div>
+              <div class="range-inputs">
+                  <input type="number" id="rand-frag-initial-min" value="0" min="0"> to <input type="number" id="rand-frag-initial-max" value="3" min="0">
+              </div>
+          </div>
+          <div class="mode-options-group" style="flex-wrap: wrap;">
+              <label>Grid Sizes to Include:</label>
+              <div class="checkbox-wrapper"><input type="checkbox" id="rand-frag-grid-random" checked><label for="rand-frag-grid-random">Random</label></div>
+              <div class="checkbox-wrapper"><input type="checkbox" id="rand-frag-grid-2x2" checked><label for="rand-frag-grid-2x2">2x2</label></div>
+              <div class="checkbox-wrapper"><input type="checkbox" id="rand-frag-grid-2x3" checked><label for="rand-frag-grid-2x3">2x3</label></div>
+              <div class="checkbox-wrapper"><input type="checkbox" id="rand-frag-grid-3x3" checked><label for="rand-frag-grid-3x3">3x3</label></div>
+          </div>
+        </div>
+
+        <div class="randomizer-section">
+          <h3>Timers to Include</h3>
+          <div class="timer-rand-controls">
+            <div class="checkbox-wrapper"><input type="checkbox" id="rand-timer-enable" checked><label for="rand-timer-enable">Randomize Round Timer</label></div>
+            <div class="range-inputs">
+              <input type="number" id="rand-timer-min" value="10" min="5"> to <input type="number" id="rand-timer-max" value="60" min="5"> (s)
+            </div>
+          </div>
+          <div class="timer-rand-controls">
+            <div class="checkbox-wrapper"><input type="checkbox" id="rand-fade-enable" checked><label for="rand-fade-enable">Randomize Image Fade</label></div>
+            <div class="range-inputs">
+               <input type="number" id="rand-fade-min" value="5" min="1"> to <input type="number" id="rand-fade-max" value="20" min="1"> (s)
+            </div>
           </div>
         </div>
       </div>
       
+      <!-- Action buttons are now outside the scrollable body -->
       <div class="modal-actions">
         <button id="start-random-btn">Start Randomized Game</button>
         <button id="cancel-random-btn" class="btn-secondary">Cancel</button>

@@ -12,6 +12,7 @@
   --leaderboard-bg: #fff;
   --leaderboard-border: #ccc;
   --leaderboard-hover: #e9ecef;
+  --fragment-bg: #1a1a1a;
 }
 html.theme-dark {
   --background-color: #333a45; --text-color: #e1e1e1; --border-color: #8899a6; --modal-bg: #222730;
@@ -97,7 +98,6 @@ body.menu-active #menu {
 .game-header { position: relative; margin-bottom: 20px; }
 .stats { display: flex; justify-content: space-around; font-size: 1.2em; font-weight: bold; }
 .stats p { margin: 0; }
-/* ++ ADDED: Style for the active settings display ++ */
 #active-settings-display {
   font-size: 0.9em;
   font-style: italic;
@@ -288,9 +288,38 @@ hr { border: 0; height: 1px; background-color: var(--leaderboard-border); margin
     min-width: 150px;
 }
 
+#fragmented-options-container {
+    flex-wrap: wrap;
+}
+.fragment-option {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.fragment-option input, .fragment-option select {
+    width: 80px;
+}
+
+/* ++ MODIFIED & ADDED: Styles for the scrollable randomizer modal ++ */
 #randomizer-modal .modal-content {
     text-align: left;
+    display: flex; /* Enable flexbox layout */
+    flex-direction: column; /* Stack children vertically */
+    max-height: 85vh; /* Never let the modal be taller than 85% of the viewport */
 }
+.modal-body {
+    flex: 1 1 auto; /* Allow this element to grow and shrink */
+    overflow-y: auto; /* Show a scrollbar ONLY when content overflows */
+    padding: 0 1em; /* Add some horizontal space */
+    margin: 0 -1em; /* Counteract parent padding to align with header */
+}
+.modal-actions {
+  text-align: center;
+  flex-shrink: 0; /* Prevent the actions container from shrinking */
+  padding-top: 1em; /* Add space above the buttons */
+  border-top: 1px solid var(--leaderboard-border); /* Separator line */
+}
+
 .randomizer-section {
     padding: 15px;
     margin-bottom: 15px;
@@ -318,8 +347,27 @@ hr { border: 0; height: 1px; background-color: var(--leaderboard-border); margin
 .timer-rand-controls .range-inputs input {
     width: 60px;
 }
-.modal-actions {
-  text-align: center;
+
+#fragment-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: grid;
+    z-index: 20;
+    gap: 2px;
+}
+.fragment-cell {
+    background-color: var(--fragment-bg);
+    transition: opacity 0.3s ease;
+}
+.fragment-cell.hidden {
+    cursor: pointer;
+}
+.fragment-cell.revealed {
+    opacity: 0;
+    pointer-events: none;
 }
 
 @media (max-width: 800px) {

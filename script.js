@@ -15,10 +15,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const MODE_OPTION_MAP_KEY = 'marioKartGeoGuessr_modeOption_map';
   const MODE_OPTION_SITE_KEY = 'marioKartGeoGuessr_modeOption_site';
   const SHOW_FADE_TIMER_KEY = 'marioKartGeoGuessr_showFadeTimer';
+  const FRAGMENT_COST_KEY = 'marioKartGeoGuessr_fragmentCost';
+  const FRAGMENT_GRID_KEY = 'marioKartGeoGuessr_fragmentGrid';
+  const FRAGMENT_INITIAL_KEY = 'marioKartGeoGuessr_fragmentInitial';
 
   const getUsedImages = () => JSON.parse(localStorage.getItem(USED_IMAGES_KEY)) || [];
   const setUsedImages = (list) => localStorage.setItem(USED_IMAGES_KEY, JSON.stringify(list));
-  const clearUsedImages = () => localStorage.removeItem(USED_IMAGES_KEY);
   
   const getPracticeUnlocks = () => JSON.parse(localStorage.getItem(PRACTICE_UNLOCKS_KEY)) || [];
   const setPracticeUnlocks = (list) => localStorage.setItem(PRACTICE_UNLOCKS_KEY, JSON.stringify(list));
@@ -214,6 +216,14 @@ document.addEventListener("DOMContentLoaded", () => {
       this.isRerunGame = false;
       this.isRandomizedPerRound = false;
 
+      this.isFragmentedMode = false;
+      this.fragmentGridSize = { rows: 0, cols: 0 };
+      this.fragmentCells = [];
+      this.freeRevealsRemaining = 0;
+      this.fragmentCost = 20; 
+      this.fragmentGrid = 'random';
+      this.fragmentInitialReveals = 1;
+      
       this.isPracticeMode = false;
       this.currentImageLoadedSuccessfully = false;
       this.seedWasModified = false;
@@ -327,7 +337,6 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.nextBtn.addEventListener('click', () => this.nextRound());
       this.elements.confirmBtn.addEventListener('click', () => this.confirmGuess());
       this.elements.endGameBtn.addEventListener('click', () => this.showFinalResults());
-      // No reset button to bind
       this.elements.backToMenuBtn.addEventListener('click', () => { if (confirm("Are you sure you want to quit? Your score will not be saved.")) { this.hideGameAndShowMenu(); } });
       
       this.elements.modalPlayAgainBtn.addEventListener('click', () => {
@@ -360,10 +369,11 @@ document.addEventListener("DOMContentLoaded", () => {
         this.elements.modeSelector.value = "normal";
         this.elements.modeSelector.dispatchEvent(new Event('change'));
       });
+      this.elements.revealFragmentBtn.addEventListener('click', () => this._revealRandomFragment());
     }
 
     handleMagnifierEnter(e) {
-      if (this.isImageInteraction) return;
+      if (this.isImageInteraction || this.isFragmentedMode) return;
 
       if (this.currentImageLoadedSuccessfully && !this.elements.trackWrapper.classList.contains('faded-out')) {
         this.elements.magnifier.style.display = 'block';
@@ -375,7 +385,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     handleMagnifierMove(e) {
-      if (this.isImageInteraction) return;
+      if (this.isImageInteraction || this.isFragmentedMode) return;
       if (this.elements.magnifier.style.display !== 'block') return;
 
       const { trackWrapper, trackContainer, trackImage, magnifier } = this.elements;
@@ -434,63 +444,111 @@ document.addEventListener("DOMContentLoaded", () => {
     
     _randomizeCurrentSettings() {
       const { 
-        randModeMirror, randModeInverted,
+        randModeMirror, randModeInverted, randModeFragmented,
         randMirrorTrack, randMirrorMap, randMirrorSite,
         randInvertedTrack, randInvertedMap, randInvertedSite,
         randTimerEnable, randTimerMin, randTimerMax,
-        randFadeEnable, randFadeMin, randFadeMax
+        randFadeEnable, randFadeMin, randFadeMax,
+        randFragCostEnable, randFragCostMin, randFragCostMax,
+        randFragInitialEnable, randFragInitialMin, randFragInitialMax,
+        randFragGridRandom, randFragGrid2x2, randFragGrid2x3, randFragGrid3x3
       } = this.elements;
 
-      const buildModifierPool = (isMirror, isMirrorChecked, isInverted, isInvertedChecked) => {
-        const pool = ['normal'];
-        if (isMirror && isMirrorChecked) pool.push('mirror');
-        if (isInverted && isInvertedChecked) pool.push('inverted');
-        if (isMirror && isMirrorChecked && isInverted && isInvertedChecked) pool.push('both');
-        return pool;
-      };
+      const baseModePool = ['normal'];
+      if (randModeMirror.checked || randModeInverted.checked) {
+        baseModePool.push('effects'); 
+      }
+      if (randModeFragmented.checked) {
+        baseModePool.push('fragmented');
+      }
+      const chosenBaseMode = baseModePool[Math.floor(Math.random() * baseModePool.length)];
 
-      const trackModifiers = buildModifierPool(randModeMirror.checked, randMirrorTrack.checked, randModeInverted.checked, randInvertedTrack.checked);
-      const mapModifiers = buildModifierPool(randModeMirror.checked, randMirrorMap.checked, randModeInverted.checked, randInvertedMap.checked);
-      const siteModifiers = buildModifierPool(randModeMirror.checked, randMirrorSite.checked, randModeInverted.checked, randInvertedSite.checked);
+      this.gameMode = 'normal';
+      this.isFragmentedMode = false;
+      this.isMirrorTrack = false; this.isMirrorMap = false; this.isMirrorSite = false;
+      this.isInvertedTrack = false; this.isInvertedMap = false; this.isInvertedSite = false;
 
-      const randomTrack = trackModifiers[Math.floor(Math.random() * trackModifiers.length)];
-      const randomMap = mapModifiers[Math.floor(Math.random() * mapModifiers.length)];
-      const randomSite = siteModifiers[Math.floor(Math.random() * siteModifiers.length)];
+      if (chosenBaseMode === 'fragmented') {
+        this.gameMode = 'fragmented';
+        this.isFragmentedMode = true;
 
-      this.isMirrorTrack = randomTrack === 'mirror' || randomTrack === 'both';
-      this.isInvertedTrack = randomTrack === 'inverted' || randomTrack === 'both';
-      this.isMirrorMap = randomMap === 'mirror' || randomMap === 'both';
-      this.isInvertedMap = randomMap === 'inverted' || randomMap === 'both';
-      this.isMirrorSite = randomSite === 'mirror' || randomSite === 'both';
-      this.isInvertedSite = randomSite === 'inverted' || randomSite === 'both';
+        if (randFragCostEnable.checked) {
+          const min = parseInt(randFragCostMin.value, 10); const max = parseInt(randFragCostMax.value, 10);
+          this.fragmentCost = Math.floor(Math.random() * ((max - min) / 5 + 1)) * 5 + min;
+        } else {
+          this.fragmentCost = parseInt(this.elements.fragmentCost.value, 10);
+        }
+
+        if (randFragInitialEnable.checked) {
+          const min = parseInt(randFragInitialMin.value, 10); const max = parseInt(randFragInitialMax.value, 10);
+          this.fragmentInitialReveals = Math.floor(Math.random() * (max - min + 1)) + min;
+        } else {
+          this.fragmentInitialReveals = parseInt(this.elements.fragmentInitialReveals.value, 10);
+        }
+
+        const gridPool = [];
+        if (randFragGridRandom.checked) gridPool.push('random');
+        if (randFragGrid2x2.checked) gridPool.push('2x2');
+        if (randFragGrid2x3.checked) gridPool.push('2x3');
+        if (randFragGrid3x3.checked) gridPool.push('3x3');
+        this.fragmentGrid = gridPool.length > 0 ? gridPool[Math.floor(Math.random() * gridPool.length)] : 'random';
+
+      } else if (chosenBaseMode === 'effects') {
+        const buildModifierPool = (isMirror, isMirrorChecked, isInverted, isInvertedChecked) => {
+          const pool = ['normal'];
+          if (isMirror && isMirrorChecked) pool.push('mirror');
+          if (isInverted && isInvertedChecked) pool.push('inverted');
+          if (isMirror && isMirrorChecked && isInverted && isInvertedChecked) pool.push('both');
+          return pool;
+        };
+
+        const modePool = [];
+        if (randModeMirror.checked) modePool.push('mirror');
+        if (randModeInverted.checked) modePool.push('inverted');
+        if (modePool.length > 0) this.gameMode = modePool[Math.floor(Math.random() * modePool.length)];
+
+        const trackModifiers = buildModifierPool(randModeMirror.checked, randMirrorTrack.checked, randModeInverted.checked, randInvertedTrack.checked);
+        const mapModifiers = buildModifierPool(randModeMirror.checked, randMirrorMap.checked, randModeInverted.checked, randInvertedMap.checked);
+        const siteModifiers = buildModifierPool(randModeMirror.checked, randMirrorSite.checked, randModeInverted.checked, randInvertedSite.checked);
+
+        const randomTrack = trackModifiers[Math.floor(Math.random() * trackModifiers.length)];
+        const randomMap = mapModifiers[Math.floor(Math.random() * mapModifiers.length)];
+        const randomSite = siteModifiers[Math.floor(Math.random() * siteModifiers.length)];
+
+        this.isMirrorTrack = randomTrack === 'mirror' || randomTrack === 'both';
+        this.isInvertedTrack = randomTrack === 'inverted' || randomTrack === 'both';
+        this.isMirrorMap = randomMap === 'mirror' || randomMap === 'both';
+        this.isInvertedMap = randomMap === 'inverted' || randomMap === 'both';
+        this.isMirrorSite = randomSite === 'mirror' || randomSite === 'both';
+        this.isInvertedSite = randomSite === 'inverted' || randomSite === 'both';
+      }
       
       if (randTimerEnable.checked) {
         this.isTimerEnabled = true;
-        const min = parseInt(randTimerMin.value, 10);
-        const max = parseInt(randTimerMax.value, 10);
+        const min = parseInt(randTimerMin.value, 10); const max = parseInt(randTimerMax.value, 10);
         this.timerDuration = Math.floor(Math.random() * (max - min + 1)) + min;
       } else {
-        this.isTimerEnabled = false;
+        this.isTimerEnabled = !this.elements.unlimitedTimeCheckbox.checked;
+        this.timerDuration = parseInt(this.elements.roundTimerInput.value, 10);
       }
 
       if (randFadeEnable.checked) {
         this.isFadeTimerEnabled = true;
-        const min = parseInt(randFadeMin.value, 10);
-        const max = parseInt(randFadeMax.value, 10);
+        const min = parseInt(randFadeMin.value, 10); const max = parseInt(randFadeMax.value, 10);
         this.fadeTimerDuration = Math.floor(Math.random() * (max - min + 1)) + min;
       } else {
-        this.isFadeTimerEnabled = false;
+        this.isFadeTimerEnabled = this.elements.fadeTimerCheckbox.checked;
+        this.fadeTimerDuration = parseInt(this.elements.fadeTimerInput.value, 10);
       }
     }
     
     startRandomizedGame() {
       const { 
-        randModeMirror, randModeInverted,
-        randTimerEnable, // ++ CORRECTED: The typo is fixed here ++
-        randFadeEnable, randomizerModal, randPerRound 
+        randModeMirror, randModeInverted, randModeFragmented,
+        randTimerEnable, randFadeEnable, randomizerModal, randPerRound 
       } = this.elements;
 
-      if (!randModeMirror.checked && !randModeInverted.checked && !randTimerEnable.checked && !randFadeEnable.checked) {
+      if (!randModeMirror.checked && !randModeInverted.checked && !randModeFragmented.checked && !randTimerEnable.checked && !randFadeEnable.checked) {
           alert('You must select at least one option to randomize!');
           return;
       }
@@ -508,12 +566,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
     setupGameSettings() {
         this.gameMode = this.elements.modeSelector.value;
-        this.isMirrorTrack = (this.gameMode === 'mirror' && this.elements.modeOptionTrack.checked);
-        this.isMirrorMap = (this.gameMode === 'mirror' && this.elements.modeOptionMap.checked);
-        this.isMirrorSite = (this.gameMode === 'mirror' && this.elements.modeOptionSite.checked);
-        this.isInvertedTrack = (this.gameMode === 'inverted' && this.elements.modeOptionTrack.checked);
-        this.isInvertedMap = (this.gameMode === 'inverted' && this.elements.modeOptionMap.checked);
-        this.isInvertedSite = (this.gameMode === 'inverted' && this.elements.modeOptionSite.checked);
+        this.isFragmentedMode = this.gameMode === 'fragmented';
+
+        // Reset all effects before setting them based on mode
+        this.isMirrorTrack = false; this.isMirrorMap = false; this.isMirrorSite = false;
+        this.isInvertedTrack = false; this.isInvertedMap = false; this.isInvertedSite = false;
+
+        if (this.isFragmentedMode) {
+          this.fragmentCost = parseInt(this.elements.fragmentCost.value, 10) || 20;
+          this.fragmentGrid = this.elements.fragmentGridSize.value;
+          this.fragmentInitialReveals = parseInt(this.elements.fragmentInitialReveals.value, 10) || 1;
+        } else {
+          this.isMirrorTrack = (this.gameMode === 'mirror' && this.elements.modeOptionTrack.checked);
+          this.isMirrorMap = (this.gameMode === 'mirror' && this.elements.modeOptionMap.checked);
+          this.isMirrorSite = (this.gameMode === 'mirror' && this.elements.modeOptionSite.checked);
+          this.isInvertedTrack = (this.gameMode === 'inverted' && this.elements.modeOptionTrack.checked);
+          this.isInvertedMap = (this.gameMode === 'inverted' && this.elements.modeOptionMap.checked);
+          this.isInvertedSite = (this.gameMode === 'inverted' && this.elements.modeOptionSite.checked);
+        }
         
         this.isTimerEnabled = !this.elements.unlimitedTimeCheckbox.checked;
         const roundDuration = parseInt(this.elements.roundTimerInput.value, 10);
@@ -578,24 +648,29 @@ document.addEventListener("DOMContentLoaded", () => {
     _updateActiveSettingsDisplay() {
         let parts = [];
         
-        const mirrorParts = [];
-        if (this.isMirrorTrack) mirrorParts.push('Track');
-        if (this.isMirrorMap) mirrorParts.push('Map');
-        if (this.isMirrorSite) mirrorParts.push('Site');
-        parts.push(`Mirror: ${mirrorParts.length > 0 ? mirrorParts.join(', ') : 'None'}`);
+        if (this.isFragmentedMode) {
+          const gridInfo = this.fragmentGrid === 'random' ? 'Random' : this.fragmentGridSize.rows ? `${this.fragmentGridSize.rows}x${this.fragmentGridSize.cols}` : 'Random';
+          parts.push(`Mode: Fragmented (${gridInfo})`);
+        } else {
+          const mirrorParts = [];
+          if (this.isMirrorTrack) mirrorParts.push('Track');
+          if (this.isMirrorMap) mirrorParts.push('Map');
+          if (this.isMirrorSite) mirrorParts.push('Site');
+          if(mirrorParts.length > 0) parts.push(`Mirror: ${mirrorParts.join(', ')}`);
 
-        const invertedParts = [];
-        if (this.isInvertedTrack) invertedParts.push('Track');
-        if (this.isInvertedMap) invertedParts.push('Map');
-        if (this.isInvertedSite) invertedParts.push('Site');
-        parts.push(`Invert: ${invertedParts.length > 0 ? invertedParts.join(', ') : 'None'}`);
+          const invertedParts = [];
+          if (this.isInvertedTrack) invertedParts.push('Track');
+          if (this.isInvertedMap) invertedParts.push('Map');
+          if (this.isInvertedSite) invertedParts.push('Site');
+          if(invertedParts.length > 0) parts.push(`Invert: ${invertedParts.join(', ')}`);
+        }
 
         const timerParts = [];
         if (this.isTimerEnabled) timerParts.push(`Round (${this.timerDuration}s)`);
         if (this.isFadeTimerEnabled) timerParts.push(`Fade (${this.fadeTimerDuration}s)`);
-        parts.push(`Timers: ${timerParts.length > 0 ? timerParts.join(', ') : 'Off'}`);
+        if(timerParts.length > 0) parts.push(`Timers: ${timerParts.join(', ')}`);
 
-        this.elements.activeSettingsDisplay.textContent = `Active Settings: ${parts.join(' | ')}`;
+        this.elements.activeSettingsDisplay.textContent = parts.length > 0 ? `Active Settings: ${parts.join(' | ')}` : '';
     }
 
     applyInGameEffects() {
@@ -666,6 +741,15 @@ document.addEventListener("DOMContentLoaded", () => {
       if (this.isRandomizedPerRound) {
         this._randomizeCurrentSettings();
       }
+      
+      this.isFragmentedMode = this.gameMode === 'fragmented';
+      this.elements.revealFragmentBtn.hidden = !this.isFragmentedMode;
+      this.elements.fragmentOverlay.innerHTML = '';
+      if (this.isFragmentedMode) {
+          this.freeRevealsRemaining = (this.round === 0) ? 2 : 0;
+          this._createFragmentGrid();
+      }
+      
       this.applyInGameEffects();
       this._updateActiveSettingsDisplay();
 
@@ -738,6 +822,9 @@ document.addEventListener("DOMContentLoaded", () => {
         this.stopAllTimers();
         if (!this.canGuess) return;
         this.canGuess = false;
+        
+        this.elements.fragmentOverlay.innerHTML = '';
+        this.elements.revealFragmentBtn.hidden = true;
 
         this.elements.trackNameDisplay.textContent = this.currentTrack.name || "Unknown Location";
         this.elements.trackWrapper.classList.remove('faded-out');
@@ -756,9 +843,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const dx = this.confirmedGuess.x - answerX;
             const dy = this.confirmedGuess.y - this.currentTrack.mapY;
             const distance = Math.hypot(dx, dy);
-            let points = 0;
-            if (distance <= 15) points = 200;
-            else if (distance <= 200) points = Math.round(200 - distance);
+            let points = 200;
+            if (distance > 15) points = Math.max(0, Math.round(200 - distance));
             
             this.score += points;
             this.elements.scoreDisplay.textContent = `Score: ${this.score}`;
@@ -840,6 +926,8 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
       this.canGuess = false;
+      this.elements.fragmentOverlay.innerHTML = '';
+      this.elements.revealFragmentBtn.hidden = true;
       this.elements.trackNameDisplay.textContent = this.currentTrack.name || "Unknown Location";
       this.elements.trackWrapper.classList.remove('faded-out');
       this.elements.magnifier.style.display = 'none';
@@ -851,8 +939,8 @@ document.addEventListener("DOMContentLoaded", () => {
       
       const dx = this.pendingGuess.x - answerX;
       const dy = this.pendingGuess.y - this.currentTrack.mapY;
-      const distance = Math.hypot(dx, dy); let points = 0;
-      if (distance <= 15) points = 200; else if (distance <= 200) points = Math.round(200 - distance);
+      const distance = Math.hypot(dx, dy); let points = 200;
+      if (distance > 15) points = Math.max(0, Math.round(200 - distance));
       this.score += points;
       
       this.elements.scoreDisplay.textContent = `Score: ${this.score}`;
@@ -905,6 +993,8 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.timerDisplay.hidden = false;
       this.elements.trackNameDisplay.textContent = "";
       this.elements.fadeTimerDisplay.hidden = true;
+      this.elements.fragmentOverlay.innerHTML = '';
+      this.elements.revealFragmentBtn.hidden = true;
       
       this.displayLeaderboard();
       this.populatePracticeGrid();
@@ -966,6 +1056,89 @@ document.addEventListener("DOMContentLoaded", () => {
         alert(message);
       }).catch(err => { console.error('Could not copy text: ', err); alert('Failed to copy seed.'); });
     }
+
+    _createFragmentGrid() {
+        const { fragmentOverlay } = this.elements;
+        fragmentOverlay.innerHTML = '';
+        this.fragmentCells = [];
+        
+        const gridOptions = { "2x2": {r:2, c:2}, "2x3": {r:2, c:3}, "3x3": {r:3, c:3} };
+        const randomGridKeys = Object.keys(gridOptions);
+        const selectedGridKey = this.fragmentGrid === 'random' ? randomGridKeys[Math.floor(Math.random() * randomGridKeys.length)] : this.fragmentGrid;
+        const { r, c } = gridOptions[selectedGridKey] || { r: 3, c: 3 }; // Fallback
+        this.fragmentGridSize = { rows: r, cols: c };
+        
+        fragmentOverlay.style.gridTemplateColumns = `repeat(${c}, 1fr)`;
+        fragmentOverlay.style.gridTemplateRows = `repeat(${r}, 1fr)`;
+        
+        const totalCells = r * c;
+        const fragment = document.createDocumentFragment();
+        for (let i = 0; i < totalCells; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'fragment-cell hidden';
+            cell.dataset.index = i;
+            this.fragmentCells.push(cell);
+            fragment.appendChild(cell);
+        }
+        fragmentOverlay.appendChild(fragment);
+
+        const revealCount = Math.min(totalCells, this.fragmentInitialReveals);
+        const indices = Array.from({ length: totalCells }, (_, i) => i);
+        const shuffledIndices = seededShuffle(indices, this.gameSeed + this.round);
+        for(let i=0; i < revealCount; i++) {
+            this._revealFragmentByIndex(shuffledIndices.pop());
+        }
+        this._updateRevealButtonState();
+    }
+
+    _revealFragmentByIndex(index) {
+        const cell = this.fragmentCells[index];
+        if (cell && cell.classList.contains('hidden')) {
+            cell.classList.remove('hidden');
+            cell.classList.add('revealed');
+        }
+    }
+    
+    _updateRevealButtonState() {
+        const { revealFragmentBtn } = this.elements;
+        const hiddenCellCount = this.fragmentCells.filter(c => c.classList.contains('hidden')).length;
+
+        if (hiddenCellCount === 0) {
+            revealFragmentBtn.disabled = true;
+            revealFragmentBtn.textContent = 'All Revealed';
+            return;
+        }
+
+        if (this.freeRevealsRemaining > 0) {
+            revealFragmentBtn.disabled = false;
+            revealFragmentBtn.textContent = `Reveal More (Free: ${this.freeRevealsRemaining})`;
+        } else {
+            revealFragmentBtn.textContent = `Reveal More (-${this.fragmentCost} pts)`;
+            revealFragmentBtn.disabled = this.score < this.fragmentCost;
+        }
+    }
+    
+    _revealRandomFragment() {
+        const hiddenCells = this.fragmentCells.filter(cell => cell.classList.contains('hidden'));
+        if (hiddenCells.length === 0) return;
+
+        const randomCell = hiddenCells[Math.floor(Math.random() * hiddenCells.length)];
+        const indexToReveal = parseInt(randomCell.dataset.index, 10);
+        
+        if (this.freeRevealsRemaining > 0) {
+            this.freeRevealsRemaining--;
+            this._revealFragmentByIndex(indexToReveal);
+        } else {
+            if (this.score < this.fragmentCost) {
+                alert("Not enough points to reveal another fragment!");
+                return;
+            }
+            this.score -= this.fragmentCost;
+            this.elements.scoreDisplay.textContent = `Score: ${this.score}`;
+            this._revealFragmentByIndex(indexToReveal);
+        }
+        this._updateRevealButtonState();
+    }
   }
 
   const elements = {
@@ -992,7 +1165,6 @@ document.addEventListener("DOMContentLoaded", () => {
     markerAnswer: document.getElementById("marker-answer"),
     guessLine: document.getElementById("guess-line"), 
     statusText: document.getElementById("used-images-status"), 
-    // resetUsedBtn: document.getElementById("reset-used-btn"), // Button is removed
     leaderboardList: document.getElementById("leaderboard-list"), 
     backToMenuBtn: document.getElementById("back-to-menu-btn"),
     endGameModal: document.getElementById("end-game-modal"), 
@@ -1043,99 +1215,53 @@ document.addEventListener("DOMContentLoaded", () => {
     randFadeMax: document.getElementById('rand-fade-max'),
     showFadeTimerCheckbox: document.getElementById('show-fade-timer-checkbox'),
     fadeTimerDisplay: document.getElementById('fade-timer-display'),
-    activeSettingsDisplay: document.getElementById('active-settings-display'), // ++ CORRECTED: Added element to object
+    activeSettingsDisplay: document.getElementById('active-settings-display'),
     randPerGame: document.getElementById('rand-per-game'),
     randPerRound: document.getElementById('rand-per-round'),
+    fragmentOverlay: document.getElementById('fragment-overlay'),
+    revealFragmentBtn: document.getElementById('reveal-fragment-btn'),
+    fragmentedOptionsContainer: document.getElementById('fragmented-options-container'),
+    fragmentCost: document.getElementById('fragment-cost'),
+    fragmentGridSize: document.getElementById('fragment-grid-size'),
+    fragmentInitialReveals: document.getElementById('fragment-initial-reveals'),
+    randModeFragmented: document.getElementById('rand-mode-fragmented'),
+    randFragmentedOptions: document.getElementById('rand-fragmented-options'),
+    randFragCostEnable: document.getElementById('rand-frag-cost-enable'),
+    randFragCostMin: document.getElementById('rand-frag-cost-min'),
+    randFragCostMax: document.getElementById('rand-frag-cost-max'),
+    randFragInitialEnable: document.getElementById('rand-frag-initial-enable'),
+    randFragInitialMin: document.getElementById('rand-frag-initial-min'),
+    randFragInitialMax: document.getElementById('rand-frag-initial-max'),
+    randFragGridRandom: document.getElementById('rand-frag-grid-random'),
+    randFragGrid2x2: document.getElementById('rand-frag-grid-2x2'),
+    randFragGrid2x3: document.getElementById('rand-frag-grid-2x3'),
+    randFragGrid3x3: document.getElementById('rand-frag-grid-3x3'),
   };
   
   new Game(elements);
 
+  // --- Initial Setup ---
   elements.initialStartBtn.addEventListener('click', () => {
     document.body.classList.add('menu-active');
   });
 
+  // --- Main Menu Controls ---
   elements.unlimitedTimeCheckbox.addEventListener('change', (e) => {
     elements.roundTimerInput.disabled = e.target.checked;
   });
   elements.fadeTimerCheckbox.addEventListener('change', (e) => {
     elements.fadeTimerInput.disabled = !e.target.checked;
+    elements.showFadeTimerCheckbox.disabled = !e.target.checked;
   });
   elements.fadeTimerCheckbox.dispatchEvent(new Event('change'));
 
   elements.showFadeTimerCheckbox.addEventListener('change', (e) => {
     localStorage.setItem(SHOW_FADE_TIMER_KEY, e.target.checked);
   });
-  function loadShowFadeTimerSetting() {
-    const saved = localStorage.getItem(SHOW_FADE_TIMER_KEY);
-    elements.showFadeTimerCheckbox.checked = saved !== 'false';
-  }
-
-  function applySiteEffects() {
-      const mode = elements.modeSelector.value;
-      const isSiteOptionChecked = elements.modeOptionSite.checked;
-      document.body.classList.toggle('mirror-site', mode === 'mirror' && isSiteOptionChecked);
-      document.documentElement.classList.toggle('inverted-site', mode === 'inverted' && isSiteOptionChecked);
-  }
-
-  function handleModeOptionChange() {
-      if (elements.modeOptionSite.checked) {
-          elements.modeOptionTrack.checked = true;
-          elements.modeOptionMap.checked = true;
-          elements.modeOptionTrack.disabled = true;
-          elements.modeOptionMap.disabled = true;
-      } else {
-          elements.modeOptionTrack.disabled = false;
-          elements.modeOptionMap.disabled = false;
-      }
-      
-      localStorage.setItem(MODE_OPTION_TRACK_KEY, elements.modeOptionTrack.checked);
-      localStorage.setItem(MODE_OPTION_MAP_KEY, elements.modeOptionMap.checked);
-      localStorage.setItem(MODE_OPTION_SITE_KEY, elements.modeOptionSite.checked);
-      
-      applySiteEffects();
-  }
-
-  function updateModeOptionsUI() {
-      const mode = elements.modeSelector.value;
-      if (mode === 'normal' || mode === '') {
-          elements.modeOptionsContainer.hidden = true;
-          elements.resetModeBtn.hidden = true;
-      } else {
-          elements.modeOptionsContainer.hidden = false;
-          elements.resetModeBtn.hidden = false;
-      }
-      handleModeOptionChange();
-  }
   
-  elements.modeSelector.addEventListener('change', () => {
-      localStorage.setItem(MODE_KEY, elements.modeSelector.value);
-      updateModeOptionsUI();
-  });
-
-  elements.modeOptionsContainer.addEventListener('change', handleModeOptionChange);
-  
-  function loadAndSetModeUI() {
-      const savedMode = localStorage.getItem(MODE_KEY);
-      const track = localStorage.getItem(MODE_OPTION_TRACK_KEY) !== 'false'; 
-      const map = localStorage.getItem(MODE_OPTION_MAP_KEY) === 'true';
-      const site = localStorage.getItem(MODE_OPTION_SITE_KEY) === 'true';
-
-      if (savedMode) {
-          elements.modeSelector.value = savedMode;
-      }
-
-      elements.modeOptionTrack.checked = track;
-      elements.modeOptionMap.checked = map;
-      elements.modeOptionSite.checked = site;
-      
-      updateModeOptionsUI();
-  }
-
-  const THEME_KEY = 'marioKartGeoGuessr_theme';
-  const CUSTOM_COLOR_KEY = 'marioKartGeoGuessr_customColor';
-  
+  // --- Theme Controls ---
   function applyTheme(theme, customColor) {
-    document.documentElement.classList.remove('theme-dark', 'theme-darker', 'theme-black');
+    document.documentElement.className = ''; // Clear all theme classes
     document.documentElement.style.setProperty('--background-color', '');
     document.documentElement.style.setProperty('--text-color', '');
     if (theme === 'custom') {
@@ -1154,84 +1280,162 @@ document.addEventListener("DOMContentLoaded", () => {
         document.documentElement.classList.add(`theme-${theme}`);
       }
     }
+    // Re-apply inverted-site if it was active
+    if (localStorage.getItem(MODE_KEY) === 'inverted' && localStorage.getItem(MODE_OPTION_SITE_KEY) === 'true') {
+        document.documentElement.classList.add('inverted-site');
+    }
   }
-  function loadAndSetThemeUI() {
-    const savedTheme = localStorage.getItem(THEME_KEY) || 'light';
-    const savedCustomColor = localStorage.getItem(CUSTOM_COLOR_KEY) || '#f0f0f0';
-    elements.themeSelector.value = savedTheme;
-    elements.customBgColorInput.value = savedCustomColor;
-    applyTheme(savedTheme, savedCustomColor);
-  }
+  
   elements.themeSelector.addEventListener('change', () => {
     const selectedTheme = elements.themeSelector.value;
     const customColor = elements.customBgColorInput.value;
-    localStorage.setItem(THEME_KEY, selectedTheme);
+    localStorage.setItem('marioKartGeoGuessr_theme', selectedTheme);
     applyTheme(selectedTheme, customColor);
   });
   elements.customBgColorInput.addEventListener('input', () => {
     const customColor = elements.customBgColorInput.value;
-    localStorage.setItem(CUSTOM_COLOR_KEY, customColor);
+    localStorage.setItem('marioKartGeoGuessr_customColor', customColor);
     if (elements.themeSelector.value === 'custom') {
       applyTheme('custom', customColor);
     }
   });
-  
-  loadAndSetThemeUI();
-  loadAndSetModeUI();
-  loadShowFadeTimerSetting();
 
-  const setupRandomizerOptionGroup = (mainCheckbox, optionsContainer, trackBox, mapBox, siteBox) => {
-    mainCheckbox.addEventListener('change', () => {
-      optionsContainer.classList.toggle('disabled', !mainCheckbox.checked);
-    });
-    siteBox.addEventListener('change', () => {
-      if (siteBox.checked) {
-        trackBox.checked = true;
-        mapBox.checked = true;
-        trackBox.disabled = true;
-        mapBox.disabled = true;
+  // --- Game Mode Controls ---
+  function applySiteEffects() {
+      const mode = elements.modeSelector.value;
+      const isSiteOptionChecked = elements.modeOptionSite.checked;
+      document.body.classList.toggle('mirror-site', mode === 'mirror' && isSiteOptionChecked);
+      document.documentElement.classList.toggle('inverted-site', mode === 'inverted' && isSiteOptionChecked);
+  }
+
+  function handleModeOptionChange() {
+      if (elements.modeOptionSite.checked) {
+          elements.modeOptionTrack.checked = true;
+          elements.modeOptionMap.checked = true;
+          elements.modeOptionTrack.disabled = true;
+          elements.modeOptionMap.disabled = true;
       } else {
-        trackBox.disabled = false;
-        mapBox.disabled = false;
+          elements.modeOptionTrack.disabled = false;
+          elements.modeOptionMap.disabled = false;
       }
-    });
-    optionsContainer.classList.toggle('disabled', !mainCheckbox.checked);
-    if(siteBox.checked) {
-        trackBox.disabled = true;
-        mapBox.disabled = true;
-    }
-  };
-
-  setupRandomizerOptionGroup(elements.randModeMirror, elements.randMirrorOptions, elements.randMirrorTrack, elements.randMirrorMap, elements.randMirrorSite);
-  setupRandomizerOptionGroup(elements.randModeInverted, elements.randInvertedOptions, elements.randInvertedTrack, elements.randInvertedMap, elements.randInvertedSite);
-
-  elements.randTimerEnable.addEventListener('change', () => {
-    elements.randTimerMin.disabled = !elements.randTimerEnable.checked;
-    elements.randTimerMax.disabled = !elements.randTimerEnable.checked;
-  });
-  elements.randFadeEnable.addEventListener('change', () => {
-    elements.randFadeMin.disabled = !elements.randFadeEnable.checked;
-    elements.randFadeMax.disabled = !elements.randFadeEnable.checked;
-  });
+      localStorage.setItem(MODE_OPTION_TRACK_KEY, elements.modeOptionTrack.checked);
+      localStorage.setItem(MODE_OPTION_MAP_KEY, elements.modeOptionMap.checked);
+      localStorage.setItem(MODE_OPTION_SITE_KEY, elements.modeOptionSite.checked);
+      applySiteEffects();
+  }
   
-  elements.resetRandomBtn.addEventListener('click', () => {
-    elements.randPerGame.checked = true;
-    elements.randModeMirror.checked = true;
-    elements.randModeInverted.checked = true;
-    elements.randMirrorTrack.checked = true;
-    elements.randMirrorMap.checked = true;
-    elements.randMirrorSite.checked = true;
-    elements.randInvertedTrack.checked = true;
-    elements.randInvertedMap.checked = true;
-    elements.randInvertedSite.checked = true;
-    elements.randTimerEnable.checked = true;
-    elements.randFadeEnable.checked = true;
-
-    elements.randModeMirror.dispatchEvent(new Event('change'));
-    elements.randModeInverted.dispatchEvent(new Event('change'));
-    elements.randMirrorSite.dispatchEvent(new Event('change'));
-    elements.randInvertedSite.dispatchEvent(new Event('change'));
-    elements.randTimerEnable.dispatchEvent(new Event('change'));
-    elements.randFadeEnable.dispatchEvent(new Event('change'));
+  function updateModeOptionsUI() {
+      const mode = elements.modeSelector.value;
+      const isSpecialMode = mode === 'mirror' || mode === 'inverted';
+      const isFragmented = mode === 'fragmented';
+      elements.modeOptionsContainer.hidden = !isSpecialMode;
+      elements.fragmentedOptionsContainer.hidden = !isFragmented;
+      elements.resetModeBtn.hidden = mode === 'normal' || mode === '';
+      handleModeOptionChange();
+  }
+  
+  elements.modeSelector.addEventListener('change', () => {
+      localStorage.setItem(MODE_KEY, elements.modeSelector.value);
+      updateModeOptionsUI();
   });
+  elements.modeOptionsContainer.addEventListener('change', handleModeOptionChange);
+  elements.fragmentCost.addEventListener('change', () => localStorage.setItem(FRAGMENT_COST_KEY, elements.fragmentCost.value));
+  elements.fragmentGridSize.addEventListener('change', () => localStorage.setItem(FRAGMENT_GRID_KEY, elements.fragmentGridSize.value));
+  elements.fragmentInitialReveals.addEventListener('change', () => localStorage.setItem(FRAGMENT_INITIAL_KEY, elements.fragmentInitialReveals.value));
+
+  // --- Randomizer Modal Listeners ---
+  function setupRandomizerListeners() {
+      // ++ MODIFIED: This function now also hides/shows the options container ++
+      const setupOptionGroup = (mainCheckbox, optionsContainer) => {
+          mainCheckbox.addEventListener('change', () => {
+              optionsContainer.classList.toggle('disabled', !mainCheckbox.checked);
+              // Also hide the container entirely
+              optionsContainer.hidden = !mainCheckbox.checked; 
+          });
+          // Set initial state on load
+          optionsContainer.classList.toggle('disabled', !mainCheckbox.checked);
+          optionsContainer.hidden = !mainCheckbox.checked;
+      };
+
+      const setupSubOption = (checkbox, inputsToToggle) => {
+          checkbox.addEventListener('change', () => {
+              inputsToToggle.forEach(input => input.disabled = !checkbox.checked);
+          });
+          inputsToToggle.forEach(input => input.disabled = !checkbox.checked);
+      };
+
+      // Mirror, Inverted, Fragmented main toggles
+      setupOptionGroup(elements.randModeMirror, elements.randMirrorOptions);
+      setupOptionGroup(elements.randModeInverted, elements.randInvertedOptions);
+      setupOptionGroup(elements.randModeFragmented, elements.randFragmentedOptions);
+      
+      // Special logic for Site options
+      elements.randMirrorSite.addEventListener('change', () => {
+          const disabled = elements.randMirrorSite.checked;
+          elements.randMirrorTrack.checked = disabled ? true : elements.randMirrorTrack.checked;
+          elements.randMirrorMap.checked = disabled ? true : elements.randMirrorMap.checked;
+          elements.randMirrorTrack.disabled = disabled;
+          elements.randMirrorMap.disabled = disabled;
+      });
+      elements.randInvertedSite.addEventListener('change', () => {
+          const disabled = elements.randInvertedSite.checked;
+          elements.randInvertedTrack.checked = disabled ? true : elements.randInvertedTrack.checked;
+          elements.randInvertedMap.checked = disabled ? true : elements.randInvertedMap.checked;
+          elements.randInvertedTrack.disabled = disabled;
+          elements.randInvertedMap.disabled = disabled;
+      });
+
+      // Sub-options toggles
+      setupSubOption(elements.randFragCostEnable, [elements.randFragCostMin, elements.randFragCostMax]);
+      setupSubOption(elements.randFragInitialEnable, [elements.randFragInitialMin, elements.randFragInitialMax]);
+      setupSubOption(elements.randTimerEnable, [elements.randTimerMin, elements.randTimerMax]);
+      setupSubOption(elements.randFadeEnable, [elements.randFadeMin, elements.randFadeMax]);
+
+      // Reset button
+      elements.resetRandomBtn.addEventListener('click', () => {
+          const allCheckboxes = [
+              elements.randModeMirror, elements.randModeInverted, elements.randModeFragmented,
+              elements.randMirrorTrack, elements.randMirrorMap, elements.randMirrorSite,
+              elements.randInvertedTrack, elements.randInvertedMap, elements.randInvertedSite,
+              elements.randFragCostEnable, elements.randFragInitialEnable,
+              elements.randFragGridRandom, elements.randFragGrid2x2, elements.randFragGrid2x3, elements.randFragGrid3x3,
+              elements.randTimerEnable, elements.randFadeEnable
+          ];
+          allCheckboxes.forEach(cb => cb.checked = true);
+          elements.randPerGame.checked = true;
+
+          // Dispatch change events to re-apply disabled/hidden states
+          [
+              elements.randModeMirror, elements.randModeInverted, elements.randModeFragmented,
+              elements.randMirrorSite, elements.randInvertedSite,
+              elements.randFragCostEnable, elements.randFragInitialEnable,
+              elements.randTimerEnable, elements.randFadeEnable
+          ].forEach(el => el.dispatchEvent(new Event('change')));
+      });
+  }
+
+  // --- Initial Load and UI Setup ---
+  function initialLoad() {
+    const savedTheme = localStorage.getItem('marioKartGeoGuessr_theme') || 'light';
+    const savedCustomColor = localStorage.getItem('marioKartGeoGuessr_customColor') || '#f0f0f0';
+    elements.themeSelector.value = savedTheme;
+    elements.customBgColorInput.value = savedCustomColor;
+    applyTheme(savedTheme, savedCustomColor);
+
+    const savedMode = localStorage.getItem(MODE_KEY);
+    if (savedMode) elements.modeSelector.value = savedMode;
+    elements.modeOptionTrack.checked = localStorage.getItem(MODE_OPTION_TRACK_KEY) !== 'false';
+    elements.modeOptionMap.checked = localStorage.getItem(MODE_OPTION_MAP_KEY) === 'true';
+    elements.modeOptionSite.checked = localStorage.getItem(MODE_OPTION_SITE_KEY) === 'true';
+    elements.fragmentCost.value = localStorage.getItem(FRAGMENT_COST_KEY) || '20';
+    elements.fragmentGridSize.value = localStorage.getItem(FRAGMENT_GRID_KEY) || 'random';
+    elements.fragmentInitialReveals.value = localStorage.getItem(FRAGMENT_INITIAL_KEY) || '1';
+    updateModeOptionsUI();
+
+    elements.showFadeTimerCheckbox.checked = localStorage.getItem(SHOW_FADE_TIMER_KEY) !== 'false';
+
+    setupRandomizerListeners();
+  }
+
+  initialLoad();
 });
