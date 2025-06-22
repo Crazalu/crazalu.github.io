@@ -1,192 +1,38 @@
-document.addEventListener("DOMContentLoaded", () => {
-  const MAX_ROUNDS = 5;
-  const USED_IMAGES_KEY = 'marioKartGeoGuessr_usedImages';
-  const PRACTICE_UNLOCKS_KEY = 'marioKartGeoGuessr_practiceUnlocks';
-  const LEADERBOARD_KEY = 'marioKartGeoGuessr_leaderboard';
-  const LEADERBOARD_MAX_ENTRIES = 5;
-  const MAP_WIDTH = 2004;
-  const MIN_DISTANCE = 20;
+// js/game.js
 
-  const MAGNIFIER_SIZE = 150;
-  const MAGNIFICATION_LEVEL = 2.5;
-  
-  const MODE_KEY = 'marioKartGeoGuessr_mode';
-  const MODE_OPTION_TRACK_KEY = 'marioKartGeoGuessr_modeOption_track';
-  const MODE_OPTION_MAP_KEY = 'marioKartGeoGuessr_modeOption_map';
-  const MODE_OPTION_SITE_KEY = 'marioKartGeoGuessr_modeOption_site';
-  const SHOW_FADE_TIMER_KEY = 'marioKartGeoGuessr_showFadeTimer';
-  const FRAGMENT_COST_KEY = 'marioKartGeoGuessr_fragmentCost';
-  const FRAGMENT_GRID_KEY = 'marioKartGeoGuessr_fragmentGrid';
-  const FRAGMENT_INITIAL_KEY = 'marioKartGeoGuessr_fragmentInitial';
+const MAX_ROUNDS = 5;
+const MAP_WIDTH = 2004;
+const MIN_DISTANCE = 20;
+const LEADERBOARD_MAX_ENTRIES = 5;
+const MAGNIFIER_SIZE = 150;
+const MAGNIFICATION_LEVEL = 2.5;
 
-  const getUsedImages = () => JSON.parse(localStorage.getItem(USED_IMAGES_KEY)) || [];
-  const setUsedImages = (list) => localStorage.setItem(USED_IMAGES_KEY, JSON.stringify(list));
-  
-  const getPracticeUnlocks = () => JSON.parse(localStorage.getItem(PRACTICE_UNLOCKS_KEY)) || [];
-  const setPracticeUnlocks = (list) => localStorage.setItem(PRACTICE_UNLOCKS_KEY, JSON.stringify(list));
-
-  const getLeaderboard = () => JSON.parse(localStorage.getItem(LEADERBOARD_KEY)) || [];
-  const setLeaderboard = (scores) => localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(scores));
-  const generateDataHash = (data) => JSON.stringify(data).split('').reduce((acc, char) => (acc * 31 + char.charCodeAt(0)) | 0, 0);
-  function mulberry32(seed) { let a=typeof seed==='string'?Array.from(seed).reduce((a,c)=>a+c.charCodeAt(0),0):seed; return function(){a|=0;a=a+1831565813|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
-  function seededShuffle(array, seed) { const r=mulberry32(seed);const c=[...array];for(let i=c.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[c[i],c[j]]=[c[j],c[i]]}return c }
-
-  function selectSpacedTracks(shuffledList, count, minDistance) {
-    if (shuffledList.length < count) {
-        return shuffledList;
-    }
-    const result = [];
-    const pool = [...shuffledList];
-    if (pool.length > 0) {
-        result.push(pool.shift());
-    }
-    while (result.length < count && pool.length > 0) {
-        const lastTrack = result[result.length - 1];
-        const foundIndex = pool.findIndex(track => 
-            Math.hypot(track.mapX - lastTrack.mapX, track.mapY - lastTrack.mapY) > minDistance
-        );
-        if (foundIndex !== -1) {
-            const [nextTrack] = pool.splice(foundIndex, 1);
-            result.push(nextTrack);
-        } else {
-            console.warn("Could not find enough spaced-out tracks. The game will have fewer rounds.");
-            break;
-        }
-    }
-    return result;
+function selectSpacedTracks(shuffledList, count, minDistance) {
+  if (shuffledList.length < count) {
+      return shuffledList;
   }
-
-  class PanZoom {
-    constructor(wrapper, container, options = {}) {
-      this.wrapper = wrapper; this.container = container; this.options = options;
-      this.offset = { x: 0, y: 0 }; this.scale = 1; this.isDown = false; this.didPan = false;
-      this.prevPos = { x: 0, y: 0 }; this.prevPinchDist = null;
-      this.onUpCallback = options.onUp || null;
-      this.onUpdateCallback = options.onUpdate || null;
-      this.bindEvents();
-      this.wrapper.style.cursor = 'grab';
-    }
-    
-    reset() {
-      if (this.wrapper.clientWidth === 0) {
-          this.options.retryCount = (this.options.retryCount || 0) + 1;
-          if (this.options.retryCount < 20) {
-              requestAnimationFrame(() => this.reset());
-          } else {
-              console.error("PanZoom reset failed: Wrapper has no dimensions.");
-          }
-          return;
-      }
-      delete this.options.retryCount;
-
-      this.initialScale = 1; this.initialOffset = { x: 0, y: 0 };
-      if (this.options.fit) {
-        const wW = this.wrapper.clientWidth; const wH = this.wrapper.clientHeight;
-        const cW = this.container.scrollWidth; const cH = this.container.scrollHeight;
-        if (cW > 0 && cH > 0) {
-          this.initialScale = Math.min(wW / cW, wH / cH);
-          const oXP = (wW - (cW * this.initialScale)) / 2;
-          const oYP = (wH - (cH * this.initialScale)) / 2;
-          this.initialOffset.x = oXP / this.initialScale;
-          this.initialOffset.y = oYP / this.initialScale;
-        }
-      }
-      this.scale = this.initialScale; this.offset = { ...this.initialOffset };
-      this.minScale = this.initialScale; this.maxScale = this.initialScale * (this.options.maxZoom || 4);
-      this.updateTransform();
-    }
-    updateTransform() {
-      const wW = this.wrapper.clientWidth; const wH = this.wrapper.clientHeight;
-      const cW = this.container.scrollWidth; const cH = this.container.scrollHeight;
-      const mX = Math.max(0, cW * this.scale - wW); const mY = Math.max(0, cH * this.scale - wH);
-      const oX = mX / this.scale; const oY = mY / this.scale;
-      this.offset.x = Math.max(-oX, Math.min(0, this.offset.x));
-      this.offset.y = Math.max(-oY, Math.min(0, this.offset.y));
-      this.container.style.transform = `scale(${this.scale}) translate(${this.offset.x}px, ${this.offset.y}px)`;
-      
-      if (this.onUpdateCallback) {
-        this.onUpdateCallback();
-      }
-    }
-    bindEvents() {
-      this.wrapper.addEventListener('mousedown', this.handleStart.bind(this));
-      window.addEventListener('mousemove', this.handleMove.bind(this));
-      window.addEventListener('mouseup', this.handleEnd.bind(this));
-      this.wrapper.addEventListener('touchstart', this.handleStart.bind(this), { passive: true });
-      this.wrapper.addEventListener('touchmove', this.handleMove.bind(this), { passive: false });
-      window.addEventListener('touchend', this.handleEnd.bind(this));
-      this.wrapper.addEventListener('wheel', this.handleWheel.bind(this), { passive: false });
-    }
-    handleStart(e) {
-      this.isDown = true;
-      this.didPan = false;
-      const point = e.touches ? e.touches[0] : e;
-      this.prevPos = { x: point.clientX, y: point.clientY };
-      this.wrapper.classList.add('grabbing');
-      if (e.touches && e.touches.length === 2) {
-        this.prevPinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-      }
-    }
-    handleMove(e) {
-      if (!this.isDown) return;
-      if (e.touches) e.preventDefault();
-      
-      if (e.touches && e.touches.length === 2 && this.prevPinchDist) {
-        const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-        const scaleChange = dist / this.prevPinchDist;
-        const oldScale = this.scale;
-        this.scale = Math.max(this.minScale, Math.min(this.maxScale, oldScale * scaleChange));
-        
-        const rect = this.wrapper.getBoundingClientRect();
-        const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
-        const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
-
-        this.offset.x += (midX / this.scale) - (midX / oldScale);
-        this.offset.y += (midY / this.scale) - (midY / oldScale);
-
-        this.prevPinchDist = dist;
+  const result = [];
+  const pool = [...shuffledList];
+  if (pool.length > 0) {
+      result.push(pool.shift());
+  }
+  while (result.length < count && pool.length > 0) {
+      const lastTrack = result[result.length - 1];
+      const foundIndex = pool.findIndex(track => 
+          Math.hypot(track.mapX - lastTrack.mapX, track.mapY - lastTrack.mapY) > minDistance
+      );
+      if (foundIndex !== -1) {
+          const [nextTrack] = pool.splice(foundIndex, 1);
+          result.push(nextTrack);
       } else {
-        const point = e.touches ? e.touches[0] : e;
-        this.didPan = true;
-        this.offset.x += (point.clientX - this.prevPos.x) / this.scale;
-        this.offset.y += (point.clientY - this.prevPos.y) / this.scale;
-        this.prevPos = { x: point.clientX, y: point.clientY };
+          console.warn("Could not find enough spaced-out tracks. The game will have fewer rounds.");
+          break;
       }
-      this.updateTransform();
-    }
-    handleEnd(e) {
-      if (!this.isDown) return;
-      this.isDown = false;
-      this.wrapper.classList.remove('grabbing');
-      this.prevPinchDist = null;
-      if (!this.didPan && this.onUpCallback) {
-        const point = e.changedTouches ? e.changedTouches[0] : e;
-        this.onUpCallback(point);
-      }
-    }
-    handleWheel(e) {
-      e.preventDefault();
-      const oldScale = this.scale;
-      const scaleDelta = e.deltaY > 0 ? -0.1 : 0.1;
-      const newScale = Math.max(this.minScale, Math.min(this.maxScale, this.scale + scaleDelta * this.initialScale));
-      if (oldScale === newScale) return;
-
-      const rect = this.wrapper.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-
-      const pointX = (mouseX / oldScale) - this.offset.x;
-      const pointY = (mouseY / oldScale) - this.offset.y;
-      
-      this.offset.x = (mouseX / newScale) - pointX;
-      this.offset.y = (mouseY / newScale) - pointY;
-      
-      this.scale = newScale;
-      this.updateTransform();
-    }
   }
+  return result;
+}
 
-  class Game {
+class Game {
     constructor(elements) {
       this.elements = elements;
       this.isImageInteraction = false;
@@ -197,8 +43,7 @@ document.addEventListener("DOMContentLoaded", () => {
         onUp: (e) => this.handleMapClick(e),
         onUpdate: () => this.updateMarkerPositions()
       });
-
-      this.populatePracticeGrid();
+      
       this.bindEvents();
       this.updateStatusText();
       this.displayLeaderboard();
@@ -284,33 +129,6 @@ document.addEventListener("DOMContentLoaded", () => {
               this.elements.guessLine.style.display = "block";
           }
       }
-    }
-    
-    populatePracticeGrid() {
-      const grid = this.elements.practiceGrid;
-      grid.innerHTML = '';
-      const enabledTracks = TRACKS_DATA.filter(t => t.enabled !== false);
-      const unlockedImages = getPracticeUnlocks();
-
-      enabledTracks.forEach(track => {
-        const card = document.createElement('div');
-        card.className = 'practice-card';
-        const img = document.createElement('img');
-        img.src = track.image;
-        img.alt = "Image preview";
-        img.loading = 'lazy';
-        const p = document.createElement('p');
-        p.textContent = track.name || 'Unnamed';
-        card.appendChild(img);
-        card.appendChild(p);
-        
-        if (unlockedImages.includes(track.image)) {
-            card.addEventListener('click', () => this.startPracticeRound(track));
-        } else {
-            card.classList.add('locked');
-        }
-        grid.appendChild(card);
-      });
     }
     
     updateStatusText() {
@@ -419,17 +237,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const bgPosY = -logicalY * MAGNIFICATION_LEVEL + (MAGNIFIER_SIZE / 2);
 
       magnifier.style.backgroundPosition = `${bgPosX}px ${bgPosY}px`;
-    }
-    
-    startPracticeRound(track) {
-      if (!track) return;
-      if (this.elements.modeSelector.value === "") {
-        alert("Please select a game mode first!");
-        return;
-      }
-      this.setupGameSettings();
-      this.isPracticeMode = true;
-      this._startGameWithSettings({ isPractice: true, practiceTrack: track });
     }
     
     start() {
@@ -900,7 +707,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     nextRound() {
-      if (this.isPracticeMode) { this.hideGameAndShowMenu(); return; }
+      if (this.isRerunGame && this.round >= this.shuffledTracks.length - 1) {
+        this.showFinalResults();
+        return;
+      }
       this.round++;
       this.loadRound();
     }
@@ -946,9 +756,8 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.scoreDisplay.textContent = `Score: ${this.score}`;
       this.elements.resultText.textContent = `Distance: ${Math.round(distance)}px | +${points} pts`;
       
-      if (this.currentImageLoadedSuccessfully && this.elements.seedInput.value.trim() === '' && !this.isPracticeMode) {
+      if (this.currentImageLoadedSuccessfully && this.elements.seedInput.value.trim() === '' && !this.isPracticeMode && !this.isRerunGame) {
         setUsedImages([...new Set([...getUsedImages(), this.currentTrack.image])]);
-        setPracticeUnlocks([...new Set([...getPracticeUnlocks(), this.currentTrack.image])]);
       }
       
       this.confirmedGuess = this.pendingGuess;
@@ -959,12 +768,7 @@ document.addEventListener("DOMContentLoaded", () => {
       
       const isLastRound = this.round >= this.shuffledTracks.length - 1;
       if (isLastRound) {
-        if (this.isPracticeMode) {
-          this.elements.nextBtn.textContent = 'Back to Menu';
-          this.elements.nextBtn.hidden = false;
-        } else {
-          this.elements.endGameBtn.hidden = false;
-        }
+        this.elements.endGameBtn.hidden = false;
       } else {
         this.elements.nextBtn.hidden = false;
       }
@@ -997,10 +801,11 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.revealFragmentBtn.hidden = true;
       
       this.displayLeaderboard();
-      this.populatePracticeGrid();
     }
+
     showFinalResults() {
-      const maxScore = 200 * this.shuffledTracks.length;
+      const totalRounds = this.shuffledTracks.length;
+      const maxScore = 200 * totalRounds;
       this.elements.modalFinalScore.textContent = `${this.score} / ${maxScore}`;
       
       this.elements.playerNameInput.value = '';
@@ -1014,24 +819,30 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       
       const seedContainer = this.elements.modalSeedContainer;
-      seedContainer.innerHTML = `<p>Game Seed:</p><div><span>${this.gameSeed}</span><button class="btn-secondary btn-copy-seed">Copy</button></div>`;
-      seedContainer.querySelector('button').addEventListener('click', () => this.shareSeed(this.gameSeed));
+      if(this.gameSeed === 'custom') {
+        seedContainer.innerHTML = `<p>This was a custom game and cannot be shared with a seed.</p>`;
+      } else {
+        seedContainer.innerHTML = `<p>Game Seed:</p><div><span>${this.gameSeed}</span><button class="btn-secondary btn-copy-seed">Copy</button></div>`;
+        seedContainer.querySelector('button').addEventListener('click', () => this.shareSeed(this.gameSeed));
       
-      if (this.seedWasModified) {
-        const warning = document.createElement('p');
-        warning.className = 'seed-warning';
-        warning.textContent = 'Note: An image failed to load and was rerolled. This seed will not produce the same game for others.';
-        seedContainer.appendChild(warning);
+        if (this.seedWasModified) {
+          const warning = document.createElement('p');
+          warning.className = 'seed-warning';
+          warning.textContent = 'Note: An image failed to load and was rerolled. This seed will not produce the same game for others.';
+          seedContainer.appendChild(warning);
+        }
       }
 
       this.elements.endGameModal.hidden = false;
     }
+    
     isHighScore(score) {
       if (score === 0 || this.isPracticeMode || this.isRerunGame) return false;
       const scores = getLeaderboard();
       const lowestScore = scores.length > 0 ? scores[scores.length - 1].score : 0;
       return score > lowestScore || scores.length < LEADERBOARD_MAX_ENTRIES;
     }
+
     saveHighScore() {
       const name = this.elements.playerNameInput.value.trim().substring(0, 10) || "Player";
       const scores = getLeaderboard();
@@ -1041,6 +852,7 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.saveScoreBtn.disabled = true;
       this.elements.saveScoreBtn.textContent = "Saved!";
     }
+
     shareSeed(seed, savedHash) {
       navigator.clipboard.writeText(seed).then(() => {
         let message = `Seed "${seed}" copied to clipboard.`;
@@ -1139,303 +951,28 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         this._updateRevealButtonState();
     }
-  }
 
-  const elements = {
-    menu: document.getElementById("menu"), 
-    menuBackground: document.getElementById('menu-background'),
-    initialStartBtn: document.getElementById('initial-start-btn'),
-    gameUI: document.getElementById("game"), 
-    startBtn: document.getElementById("start-btn"),
-    seedInput: document.getElementById("seed"),
-    trackWrapper: document.getElementById("track-wrapper"), 
-    trackContainer: document.getElementById("track-container"),
-    trackImage: document.getElementById("track-image"), 
-    trackNameDisplay: document.getElementById("track-name-display"),
-    confirmBtn: document.getElementById("confirm-btn"), 
-    nextBtn: document.getElementById("next-btn"),
-    roundDisplay: document.getElementById("round-display"), 
-    scoreDisplay: document.getElementById("score-display"),
-    resultText: document.getElementById("result"), 
-    mapWrapper: document.getElementById("map-wrapper"), 
-    mapContainer: document.getElementById("map-container"),
-    mapImage: document.getElementById("track-map"),
-    markerGuess: document.getElementById("marker-guess"), 
-    markerPlayer: document.getElementById("marker-player"), 
-    markerAnswer: document.getElementById("marker-answer"),
-    guessLine: document.getElementById("guess-line"), 
-    statusText: document.getElementById("used-images-status"), 
-    leaderboardList: document.getElementById("leaderboard-list"), 
-    backToMenuBtn: document.getElementById("back-to-menu-btn"),
-    endGameModal: document.getElementById("end-game-modal"), 
-    modalFinalScore: document.getElementById("modal-final-score"),
-    saveScoreForm: document.getElementById("save-score-form"), 
-    playerNameInput: document.getElementById("player-name-input"),
-    saveScoreBtn: document.getElementById("save-score-btn"), 
-    modalPlayAgainBtn: document.getElementById("modal-play-again-btn"),
-    modalBackToMenuBtn: document.getElementById("modal-back-to-menu-btn"),
-    modalSeedContainer: document.getElementById("modal-seed-container"),
-    themeSelector: document.getElementById('theme-selector'),
-    customBgColorInput: document.getElementById('custom-bg-color'),
-    roundTimerInput: document.getElementById('round-timer-input'),
-    unlimitedTimeCheckbox: document.getElementById('unlimited-time-checkbox'),
-    timerDisplay: document.getElementById('timer-display'),
-    practiceGrid: document.getElementById('practice-grid'),
-    trackCredit: document.getElementById('track-credit'),
-    fadeTimerInput: document.getElementById('fade-timer-input'),
-    fadeTimerCheckbox: document.getElementById('fade-timer-checkbox'),
-    endGameBtn: document.getElementById('end-game-btn'),
-    magnifier: document.getElementById('magnifier'),
-    modeSelector: document.getElementById('mode-selector'),
-    modeOptionsContainer: document.getElementById('mode-options-container'),
-    modeOptionTrack: document.getElementById('mode-option-track'),
-    modeOptionMap: document.getElementById('mode-option-map'),
-    modeOptionSite: document.getElementById('mode-option-site'),
-    resetModeBtn: document.getElementById('reset-mode-btn'),
-    randomizerBtn: document.getElementById('randomizer-btn'),
-    randomizerModal: document.getElementById('randomizer-modal'),
-    startRandomBtn: document.getElementById('start-random-btn'),
-    cancelRandomBtn: document.getElementById('cancel-random-btn'),
-    resetRandomBtn: document.getElementById('reset-random-btn'),
-    randModeMirror: document.getElementById('rand-mode-mirror'),
-    randModeInverted: document.getElementById('rand-mode-inverted'),
-    randMirrorOptions: document.getElementById('rand-mirror-options'),
-    randMirrorTrack: document.getElementById('rand-mirror-track'),
-    randMirrorMap: document.getElementById('rand-mirror-map'),
-    randMirrorSite: document.getElementById('rand-mirror-site'),
-    randInvertedOptions: document.getElementById('rand-inverted-options'),
-    randInvertedTrack: document.getElementById('rand-inverted-track'),
-    randInvertedMap: document.getElementById('rand-inverted-map'),
-    randInvertedSite: document.getElementById('rand-inverted-site'),
-    randTimerEnable: document.getElementById('rand-timer-enable'),
-    randTimerMin: document.getElementById('rand-timer-min'),
-    randTimerMax: document.getElementById('rand-timer-max'),
-    randFadeEnable: document.getElementById('rand-fade-enable'),
-    randFadeMin: document.getElementById('rand-fade-min'),
-    randFadeMax: document.getElementById('rand-fade-max'),
-    showFadeTimerCheckbox: document.getElementById('show-fade-timer-checkbox'),
-    fadeTimerDisplay: document.getElementById('fade-timer-display'),
-    activeSettingsDisplay: document.getElementById('active-settings-display'),
-    randPerGame: document.getElementById('rand-per-game'),
-    randPerRound: document.getElementById('rand-per-round'),
-    fragmentOverlay: document.getElementById('fragment-overlay'),
-    revealFragmentBtn: document.getElementById('reveal-fragment-btn'),
-    fragmentedOptionsContainer: document.getElementById('fragmented-options-container'),
-    fragmentCost: document.getElementById('fragment-cost'),
-    fragmentGridSize: document.getElementById('fragment-grid-size'),
-    fragmentInitialReveals: document.getElementById('fragment-initial-reveals'),
-    randModeFragmented: document.getElementById('rand-mode-fragmented'),
-    randFragmentedOptions: document.getElementById('rand-fragmented-options'),
-    randFragCostEnable: document.getElementById('rand-frag-cost-enable'),
-    randFragCostMin: document.getElementById('rand-frag-cost-min'),
-    randFragCostMax: document.getElementById('rand-frag-cost-max'),
-    randFragInitialEnable: document.getElementById('rand-frag-initial-enable'),
-    randFragInitialMin: document.getElementById('rand-frag-initial-min'),
-    randFragInitialMax: document.getElementById('rand-frag-initial-max'),
-    randFragGridRandom: document.getElementById('rand-frag-grid-random'),
-    randFragGrid2x2: document.getElementById('rand-frag-grid-2x2'),
-    randFragGrid2x3: document.getElementById('rand-frag-grid-2x3'),
-    randFragGrid3x3: document.getElementById('rand-frag-grid-3x3'),
-  };
-  
-  new Game(elements);
-
-  // --- Initial Setup ---
-  elements.initialStartBtn.addEventListener('click', () => {
-    document.body.classList.add('menu-active');
-  });
-
-  // --- Main Menu Controls ---
-  elements.unlimitedTimeCheckbox.addEventListener('change', (e) => {
-    elements.roundTimerInput.disabled = e.target.checked;
-  });
-  elements.fadeTimerCheckbox.addEventListener('change', (e) => {
-    elements.fadeTimerInput.disabled = !e.target.checked;
-    elements.showFadeTimerCheckbox.disabled = !e.target.checked;
-  });
-  elements.fadeTimerCheckbox.dispatchEvent(new Event('change'));
-
-  elements.showFadeTimerCheckbox.addEventListener('change', (e) => {
-    localStorage.setItem(SHOW_FADE_TIMER_KEY, e.target.checked);
-  });
-  
-  // --- Theme Controls ---
-  function applyTheme(theme, customColor) {
-    document.documentElement.className = ''; // Clear all theme classes
-    document.documentElement.style.setProperty('--background-color', '');
-    document.documentElement.style.setProperty('--text-color', '');
-    if (theme === 'custom') {
-      elements.customBgColorInput.hidden = false;
-      document.documentElement.style.setProperty('--background-color', customColor);
-      const hex = customColor.replace('#', '');
-      const r = parseInt(hex.substring(0, 2), 16);
-      const g = parseInt(hex.substring(2, 4), 16);
-      const b = parseInt(hex.substring(4, 6), 16);
-      const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-      const textColor = brightness > 125 ? '#000000' : '#FFFFFF';
-      document.documentElement.style.setProperty('--text-color', textColor);
-    } else {
-      elements.customBgColorInput.hidden = true;
-      if (theme !== 'light') {
-        document.documentElement.classList.add(`theme-${theme}`);
+    startCustomGame(tracks) {
+      if (!tracks || tracks.length === 0) {
+        alert("No tracks selected for custom game.");
+        return;
       }
-    }
-    // Re-apply inverted-site if it was active
-    if (localStorage.getItem(MODE_KEY) === 'inverted' && localStorage.getItem(MODE_OPTION_SITE_KEY) === 'true') {
-        document.documentElement.classList.add('inverted-site');
-    }
-  }
   
-  elements.themeSelector.addEventListener('change', () => {
-    const selectedTheme = elements.themeSelector.value;
-    const customColor = elements.customBgColorInput.value;
-    localStorage.setItem('marioKartGeoGuessr_theme', selectedTheme);
-    applyTheme(selectedTheme, customColor);
-  });
-  elements.customBgColorInput.addEventListener('input', () => {
-    const customColor = elements.customBgColorInput.value;
-    localStorage.setItem('marioKartGeoGuessr_customColor', customColor);
-    if (elements.themeSelector.value === 'custom') {
-      applyTheme('custom', customColor);
-    }
-  });
-
-  // --- Game Mode Controls ---
-  function applySiteEffects() {
-      const mode = elements.modeSelector.value;
-      const isSiteOptionChecked = elements.modeOptionSite.checked;
-      document.body.classList.toggle('mirror-site', mode === 'mirror' && isSiteOptionChecked);
-      document.documentElement.classList.toggle('inverted-site', mode === 'inverted' && isSiteOptionChecked);
-  }
-
-  function handleModeOptionChange() {
-      if (elements.modeOptionSite.checked) {
-          elements.modeOptionTrack.checked = true;
-          elements.modeOptionMap.checked = true;
-          elements.modeOptionTrack.disabled = true;
-          elements.modeOptionMap.disabled = true;
-      } else {
-          elements.modeOptionTrack.disabled = false;
-          elements.modeOptionMap.disabled = false;
-      }
-      localStorage.setItem(MODE_OPTION_TRACK_KEY, elements.modeOptionTrack.checked);
-      localStorage.setItem(MODE_OPTION_MAP_KEY, elements.modeOptionMap.checked);
-      localStorage.setItem(MODE_OPTION_SITE_KEY, elements.modeOptionSite.checked);
-      applySiteEffects();
-  }
+      this.isPracticeMode = false;
+      this.isRerunGame = true; 
+      this.seedWasModified = false;
+      this.gameSeed = 'custom';
   
-  function updateModeOptionsUI() {
-      const mode = elements.modeSelector.value;
-      const isSpecialMode = mode === 'mirror' || mode === 'inverted';
-      const isFragmented = mode === 'fragmented';
-      elements.modeOptionsContainer.hidden = !isSpecialMode;
-      elements.fragmentedOptionsContainer.hidden = !isFragmented;
-      elements.resetModeBtn.hidden = mode === 'normal' || mode === '';
-      handleModeOptionChange();
-  }
-  
-  elements.modeSelector.addEventListener('change', () => {
-      localStorage.setItem(MODE_KEY, elements.modeSelector.value);
-      updateModeOptionsUI();
-  });
-  elements.modeOptionsContainer.addEventListener('change', handleModeOptionChange);
-  elements.fragmentCost.addEventListener('change', () => localStorage.setItem(FRAGMENT_COST_KEY, elements.fragmentCost.value));
-  elements.fragmentGridSize.addEventListener('change', () => localStorage.setItem(FRAGMENT_GRID_KEY, elements.fragmentGridSize.value));
-  elements.fragmentInitialReveals.addEventListener('change', () => localStorage.setItem(FRAGMENT_INITIAL_KEY, elements.fragmentInitialReveals.value));
-
-  // --- Randomizer Modal Listeners ---
-  function setupRandomizerListeners() {
-      // ++ MODIFIED: This function now also hides/shows the options container ++
-      const setupOptionGroup = (mainCheckbox, optionsContainer) => {
-          mainCheckbox.addEventListener('change', () => {
-              optionsContainer.classList.toggle('disabled', !mainCheckbox.checked);
-              // Also hide the container entirely
-              optionsContainer.hidden = !mainCheckbox.checked; 
-          });
-          // Set initial state on load
-          optionsContainer.classList.toggle('disabled', !mainCheckbox.checked);
-          optionsContainer.hidden = !mainCheckbox.checked;
-      };
-
-      const setupSubOption = (checkbox, inputsToToggle) => {
-          checkbox.addEventListener('change', () => {
-              inputsToToggle.forEach(input => input.disabled = !checkbox.checked);
-          });
-          inputsToToggle.forEach(input => input.disabled = !checkbox.checked);
-      };
-
-      // Mirror, Inverted, Fragmented main toggles
-      setupOptionGroup(elements.randModeMirror, elements.randMirrorOptions);
-      setupOptionGroup(elements.randModeInverted, elements.randInvertedOptions);
-      setupOptionGroup(elements.randModeFragmented, elements.randFragmentedOptions);
+      this.shuffledTracks = seededShuffle(tracks, Math.random());
       
-      // Special logic for Site options
-      elements.randMirrorSite.addEventListener('change', () => {
-          const disabled = elements.randMirrorSite.checked;
-          elements.randMirrorTrack.checked = disabled ? true : elements.randMirrorTrack.checked;
-          elements.randMirrorMap.checked = disabled ? true : elements.randMirrorMap.checked;
-          elements.randMirrorTrack.disabled = disabled;
-          elements.randMirrorMap.disabled = disabled;
-      });
-      elements.randInvertedSite.addEventListener('change', () => {
-          const disabled = elements.randInvertedSite.checked;
-          elements.randInvertedTrack.checked = disabled ? true : elements.randInvertedTrack.checked;
-          elements.randInvertedMap.checked = disabled ? true : elements.randInvertedMap.checked;
-          elements.randInvertedTrack.disabled = disabled;
-          elements.randInvertedMap.disabled = disabled;
-      });
-
-      // Sub-options toggles
-      setupSubOption(elements.randFragCostEnable, [elements.randFragCostMin, elements.randFragCostMax]);
-      setupSubOption(elements.randFragInitialEnable, [elements.randFragInitialMin, elements.randFragInitialMax]);
-      setupSubOption(elements.randTimerEnable, [elements.randTimerMin, elements.randTimerMax]);
-      setupSubOption(elements.randFadeEnable, [elements.randFadeMin, elements.randFadeMax]);
-
-      // Reset button
-      elements.resetRandomBtn.addEventListener('click', () => {
-          const allCheckboxes = [
-              elements.randModeMirror, elements.randModeInverted, elements.randModeFragmented,
-              elements.randMirrorTrack, elements.randMirrorMap, elements.randMirrorSite,
-              elements.randInvertedTrack, elements.randInvertedMap, elements.randInvertedSite,
-              elements.randFragCostEnable, elements.randFragInitialEnable,
-              elements.randFragGridRandom, elements.randFragGrid2x2, elements.randFragGrid2x3, elements.randFragGrid3x3,
-              elements.randTimerEnable, elements.randFadeEnable
-          ];
-          allCheckboxes.forEach(cb => cb.checked = true);
-          elements.randPerGame.checked = true;
-
-          // Dispatch change events to re-apply disabled/hidden states
-          [
-              elements.randModeMirror, elements.randModeInverted, elements.randModeFragmented,
-              elements.randMirrorSite, elements.randInvertedSite,
-              elements.randFragCostEnable, elements.randFragInitialEnable,
-              elements.randTimerEnable, elements.randFadeEnable
-          ].forEach(el => el.dispatchEvent(new Event('change')));
-      });
-  }
-
-  // --- Initial Load and UI Setup ---
-  function initialLoad() {
-    const savedTheme = localStorage.getItem('marioKartGeoGuessr_theme') || 'light';
-    const savedCustomColor = localStorage.getItem('marioKartGeoGuessr_customColor') || '#f0f0f0';
-    elements.themeSelector.value = savedTheme;
-    elements.customBgColorInput.value = savedCustomColor;
-    applyTheme(savedTheme, savedCustomColor);
-
-    const savedMode = localStorage.getItem(MODE_KEY);
-    if (savedMode) elements.modeSelector.value = savedMode;
-    elements.modeOptionTrack.checked = localStorage.getItem(MODE_OPTION_TRACK_KEY) !== 'false';
-    elements.modeOptionMap.checked = localStorage.getItem(MODE_OPTION_MAP_KEY) === 'true';
-    elements.modeOptionSite.checked = localStorage.getItem(MODE_OPTION_SITE_KEY) === 'true';
-    elements.fragmentCost.value = localStorage.getItem(FRAGMENT_COST_KEY) || '20';
-    elements.fragmentGridSize.value = localStorage.getItem(FRAGMENT_GRID_KEY) || 'random';
-    elements.fragmentInitialReveals.value = localStorage.getItem(FRAGMENT_INITIAL_KEY) || '1';
-    updateModeOptionsUI();
-
-    elements.showFadeTimerCheckbox.checked = localStorage.getItem(SHOW_FADE_TIMER_KEY) !== 'false';
-
-    setupRandomizerListeners();
-  }
-
-  initialLoad();
-});
+      this.score = 0;
+      this.round = 0;
+      this.elements.scoreDisplay.textContent = "Score: 0";
+      
+      document.body.classList.add('menu-active');
+      this.elements.menu.hidden = true;
+      this.elements.gameUI.hidden = false;
+      
+      this.loadRound();
+    }
+}
