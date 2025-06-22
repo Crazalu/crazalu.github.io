@@ -96,7 +96,7 @@
         }
         .zoom-indicator-circle.hidden { opacity: 0; }
 
-        /* --- STYLES FOR OVERVIEW MAP --- */
+        /* Styles for Overview Map */
         #full-map-overview-container {
             position: relative;
             width: 100%;
@@ -104,7 +104,7 @@
             margin: 20px auto;
             border: 3px solid #666;
             border-radius: 10px;
-            background-color: #3E7BB6; /* Show background color if map fails */
+            background-color: #3E7BB6;
         }
         #full-map-image {
             display: block;
@@ -112,17 +112,16 @@
             height: auto;
             border-radius: 7px;
         }
-        /* Style for the SVG star marker */
         .svg-marker {
             position: absolute;
-            width: 18px; /* Control size here */
+            width: 18px;
             height: 18px;
             transform: translate(-50%, -50%);
             cursor: help;
             transition: transform 0.2s ease, filter 0.2s ease;
             filter: drop-shadow(0 0 2px rgba(0,0,0,0.8));
             z-index: 10;
-            overflow: visible; /* Important for SVG */
+            overflow: visible;
         }
         .svg-marker:hover {
             transform: translate(-50%, -50%) scale(2);
@@ -149,11 +148,8 @@
     <h1>Full Map Overview</h1>
 
     <div id="full-map-overview-container">
-        <!-- Add an error handler to the map image -->
         <img id="full-map-image" src="map/mk_map.webp" alt="Full Map" 
              onerror="this.style.display='none'; document.getElementById('map-error-msg').style.display='block'">
-        
-        <!-- This message will appear ONLY if the map image fails to load -->
         <div id="map-error-msg" style="display: none;">
             MAP IMAGE FAILED TO LOAD!<br>
             Check the path in your code (`src="map/mk_map.webp"`) and make sure you are running this page from a Live Server.
@@ -165,12 +161,12 @@
         const container = document.getElementById('debug-container');
 
         if (typeof TRACKS_DATA === 'undefined' || typeof PanZoom === 'undefined') {
-            // This part seems to be working, so no changes needed.
+            // Error handling, no changes needed
         } else {
             const MAP_WIDTH = 2004;
             const MAP_HEIGHT = 1086;
 
-            // --- Logic for Individual Debug Items (unchanged, should be working) ---
+            // Logic for Individual Debug Items (unchanged)
             const createDebugItem = (track) => {
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'debug-item';
@@ -207,10 +203,18 @@
                 img.src = track.image;
             });
 
-            // --- REVISED Logic for Full Map Overview ---
+            // --- START: MODIFIED Logic for Full Map Overview ---
             const fullMapContainer = document.getElementById('full-map-overview-container');
             const markerFragment = document.createDocumentFragment();
-            const svgNS = "http://www.w3.org/2000/svg"; // SVG Namespace
+            const svgNS = "http://www.w3.org/2000/svg";
+
+            // Define the color mapping for each creator
+            const creatorColors = {
+                'SudaiDelphi':    { fill: '#9b59b6', stroke: '#8e44ad' }, // Purple
+                'Electric_Hoodie':{ fill: '#3498db', stroke: '#2980b9' }, // Blue
+                'Crazalu':        { fill: '#f1c40f', stroke: '#f39c12' }, // Gold
+                'default':        { fill: '#2ecc71', stroke: '#27ae60' }  // Green
+            };
 
             TRACKS_DATA.forEach(track => {
                 if (track.enabled === false) return;
@@ -218,29 +222,34 @@
                 const leftPercent = (track.mapX / MAP_WIDTH) * 100;
                 const topPercent = (track.mapY / MAP_HEIGHT) * 100;
 
-                // Create an SVG element instead of an IMG
+                // Determine the correct color based on the credit, or use default
+                const creator = track.credit || 'default';
+                const colors = creatorColors[creator] || creatorColors['default'];
+
                 const markerSvg = document.createElementNS(svgNS, "svg");
                 markerSvg.setAttribute("class", "svg-marker");
                 markerSvg.setAttribute("viewBox", "0 0 51 48");
                 markerSvg.style.left = `${leftPercent}%`;
                 markerSvg.style.top = `${topPercent}%`;
                 
-                // Add a title for the hover tooltip
                 const title = document.createElementNS(svgNS, "title");
-                title.textContent = `${track.name} (${track.mapX}, ${track.mapY})`;
+                title.textContent = `${track.name} (${track.mapX}, ${track.mapY}) - by ${creator}`;
                 markerSvg.appendChild(title);
 
-                // Create the star polygon inside the SVG
                 const star = document.createElementNS(svgNS, "polygon");
                 star.setAttribute("points", "25,1 31,17 49,17 35,28 40,45 25,35 10,45 15,28 1,17 19,17");
-                star.setAttribute("fill", "#FFD700"); // Gold color
-                star.setAttribute("stroke", "#C0A000"); // Darker gold border
+                
+                // Apply the selected colors
+                star.setAttribute("fill", colors.fill);
+                star.setAttribute("stroke", colors.stroke);
+
                 star.setAttribute("stroke-width", "2");
                 markerSvg.appendChild(star);
                 
                 markerFragment.appendChild(markerSvg);
             });
             fullMapContainer.appendChild(markerFragment);
+            // --- END: MODIFIED Logic for Full Map Overview ---
         }
     </script>
 
