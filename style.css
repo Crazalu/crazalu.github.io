@@ -25,6 +25,18 @@ html.theme-black {
   --background-color: #000000; --text-color: #ffffff; --border-color: #666666; --modal-bg: #111;
   --leaderboard-bg: #111; --leaderboard-border: #333; --leaderboard-hover: #222;
 }
+
+html.inverted-site {
+  filter: invert(1);
+}
+body.mirror-site {
+  transform: scaleX(-1);
+}
+html.inverted-site .inverted-by-js {
+  filter: invert(1);
+}
+
+
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; background-color: var(--background-color); color: var(--text-color); margin: 0; padding: 1em; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; transition: background-color 0.3s, color 0.3s; }
 h1 { margin: 0; padding: 0; }
 h2 { margin-top: 0; }
@@ -35,7 +47,6 @@ h2 { margin-top: 0; }
   width: 100%;
   height: auto;
 }
-/* ++ MODIFIED: Corrected menu and background styles ++ */
 #menu-background {
   position: fixed;
   top: 0;
@@ -68,17 +79,14 @@ h2 { margin-top: 0; }
   50% { transform: scale(1.05); }
   100% { transform: scale(1); }
 }
-/* When menu becomes active, fade the background out */
 body.menu-active #menu-background {
   opacity: 0;
   visibility: hidden;
   pointer-events: none; 
 }
-/* The actual menu is hidden initially */
 #menu {
   display: none;
 }
-/* When the menu is active, show the menu content */
 body.menu-active #menu {
   display: block;
 }
@@ -92,22 +100,21 @@ body.menu-active #menu {
 .interactive-area { width: 100%; overflow: hidden; border: 3px solid var(--border-color); border-radius: var(--border-radius); margin: 0; position: relative; background-color: #000; }
 .game-main-area { display: flex; gap: 20px; align-items: flex-start; }
 
-/* ADDED: Style for the panel containing the image and its name */
 .image-panel {
   flex: 1;
   display: flex;
   flex-direction: column;
 }
 
-/* ADDED: Style for the track name display */
 #track-name-display {
   margin: 10px 0 0 0;
   font-size: 1.2em;
   font-weight: 500;
-  min-height: 1.5em; /* Prevents layout jump when text is empty */
+  min-height: 1.5em; 
 }
 
-.track-wrapper { flex-shrink: 0; /* Prevents shrinking inside the flex panel */ cursor: grab; transition: opacity 0.5s ease; aspect-ratio: 3 / 2; }
+.track-wrapper { flex-shrink: 0; cursor: crosshair; transition: opacity 0.5s ease; aspect-ratio: 3 / 2; }
+
 .track-wrapper.faded-out { opacity: 0; pointer-events: none; }
 .map-wrapper { flex: 1; cursor: crosshair; background-color: var(--map-bg-color); aspect-ratio: 2004 / 1086; }
 .interactive-area.grabbing { cursor: grabbing; }
@@ -119,7 +126,6 @@ body.menu-active #menu {
   height: 100%;
 }
 
-/* MODIFIED: Added transform-origin to fix map positioning */
 #map-container {
   width: 2004px;
   height: 1086px;
@@ -138,7 +144,7 @@ button:hover { background-color: #0056b3; }
 .btn-secondary { background-color: var(--secondary-button-bg); }
 .btn-secondary:hover { background-color: #5a6268; }
 .btn-header { position: absolute; top: 0; left: 0; padding: 5px 10px; font-size: 0.9em; }
-input[type="text"], input[type="number"] { padding: 8px; margin: 0 10px 10px 5px; border: 1px solid #ccc; border-radius: 5px; }
+input[type="text"], input[type="number"], select { padding: 8px; margin: 0 5px 10px 5px; border: 1px solid #ccc; border-radius: 5px; }
 .menu-footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid var(--leaderboard-border); }
 #used-images-status { margin: 0 0 10px 0; color: #555; font-style: italic; }
 [hidden] { display: none !important; }
@@ -166,6 +172,13 @@ input[type="text"], input[type="number"] { padding: 8px; margin: 0 10px 10px 5px
 .timer-controls input[type="number"] { width: 60px; text-align: center; }
 .timer-controls .checkbox-wrapper { margin-left: 10px; }
 .checkbox-wrapper { display: inline-flex; align-items: center; gap: 5px; }
+/* ++ ADDED: Style for "crossed-out" disabled checkboxes ++ */
+.checkbox-wrapper input[type="checkbox"]:disabled + label {
+    text-decoration: line-through;
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .stats .low-time { color: #e74c3c; font-weight: bold; }
 hr { border: 0; height: 1px; background-color: var(--leaderboard-border); margin: 2em 0; }
 .practice-controls { display: flex; flex-direction: column; align-items: center; gap: 10px; }
@@ -228,16 +241,42 @@ hr { border: 0; height: 1px; background-color: var(--leaderboard-border); margin
   opacity: 0.8;
 }
 
-/* ++ ADDED: Magnifier styles ++ */
 #magnifier {
   position: absolute;
   border-radius: 50%;
   border: 3px solid var(--border-color);
   background-repeat: no-repeat;
   display: none;
-  pointer-events: none; /* Crucial: Allows panning clicks to go through */
+  pointer-events: none;
   z-index: 50;
   box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.mode-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin: 15px 0;
+}
+.mode-selector-group {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+/* ++ ADDED: Styling for the new checkbox container ++ */
+.mode-options-group {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    align-items: center;
+    padding: 5px 0;
+}
+.mode-selector-group label {
+    flex-shrink: 0;
+}
+.mode-selector-group select {
+    min-width: 150px;
 }
 
 @media (max-width: 800px) {
@@ -256,7 +295,6 @@ hr { border: 0; height: 1px; background-color: var(--leaderboard-border); margin
     grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
     gap: 10px;
   }
-  /* Hide magnifier on small screens where it's not practical */
   #magnifier {
     display: none !important;
   }

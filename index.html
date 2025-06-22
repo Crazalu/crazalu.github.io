@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en"> <!-- The theme class will be applied here -->
+<html lang="en"> <!-- The theme and mode classes will be applied here -->
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,11 +8,18 @@
   <script>
     (function() {
       const THEME_KEY = 'marioKartGeoGuessr_theme';
-
-
+      const MODE_KEY = 'marioKartGeoGuessr_mode';
+      const MODE_OPTION_SITE_KEY = 'marioKartGeoGuessr_modeOption_site';
+      
       const savedTheme = localStorage.getItem(THEME_KEY) || 'light';
       if (savedTheme !== 'light') {
         document.documentElement.classList.add(`theme-${savedTheme}`);
+      }
+      
+      const savedMode = localStorage.getItem(MODE_KEY);
+      const siteOption = localStorage.getItem(MODE_OPTION_SITE_KEY) === 'true';
+      if (savedMode === 'inverted' && siteOption) {
+        document.documentElement.classList.add('inverted-site');
       }
     })();
   </script>
@@ -23,9 +30,8 @@
 </head>
 
 
-<body>
+<body> <!-- The mirror-site class will be applied here -->
 
-  <!-- ++ NEW: Background container for the logo ++ -->
   <div id="menu-background">
     <img src="map/logo.webp" alt="Mario Kart GeoGuessr Logo">
     <button id="initial-start-btn">Click to Start</button>
@@ -38,9 +44,31 @@
         <label for="seed">Game Seed:</label>
         <input type="text" id="seed" placeholder="Leave blank for random">
         
-        <div class="checkbox-wrapper">
-          <input type="checkbox" id="mirror-mode">
-          <label for="mirror-mode">Mirror Mode</label>
+        <div class="mode-controls">
+            <div class="mode-selector-group">
+                <label for="mode-selector">Mode:</label>
+                <select id="mode-selector">
+                    <option value="" disabled selected>Select a Mode...</option>
+                    <option value="normal">Normal Mode</option>
+                    <option value="mirror">Mirror Mode</option>
+                    <option value="inverted">Inverted Mode</option>
+                </select>
+            </div>
+            <!-- ++ REPLACED: Dropdown is now a div of checkboxes ++ -->
+            <div id="mode-options-container" class="mode-options-group" hidden>
+                <div class="checkbox-wrapper">
+                    <input type="checkbox" id="mode-option-track">
+                    <label for="mode-option-track">Track</label>
+                </div>
+                 <div class="checkbox-wrapper">
+                    <input type="checkbox" id="mode-option-map">
+                    <label for="mode-option-map">Map</label>
+                </div>
+                 <div class="checkbox-wrapper">
+                    <input type="checkbox" id="mode-option-site">
+                    <label for="mode-option-site">Site</label>
+                </div>
+            </div>
         </div>
         
         <div class="timer-controls">
@@ -113,7 +141,6 @@
             <img id="track-image" src="" alt="Image to guess">
             <p id="track-credit"></p>
           </div>
-          <!-- ++ ADDED: The magnifier element ++ -->
           <div id="magnifier"></div>
         </div>
         <h3 id="track-name-display"></h3>

@@ -9,6 +9,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const MAGNIFIER_SIZE = 150;
   const MAGNIFICATION_LEVEL = 2.5;
+  
+  const MODE_KEY = 'marioKartGeoGuessr_mode';
+  // ++ REPLACED: New keys for individual checkboxes ++
+  const MODE_OPTION_TRACK_KEY = 'marioKartGeoGuessr_modeOption_track';
+  const MODE_OPTION_MAP_KEY = 'marioKartGeoGuessr_modeOption_map';
+  const MODE_OPTION_SITE_KEY = 'marioKartGeoGuessr_modeOption_site';
 
   const getUsedImages = () => JSON.parse(localStorage.getItem(USED_IMAGES_KEY)) || [];
   const setUsedImages = (list) => localStorage.setItem(USED_IMAGES_KEY, JSON.stringify(list));
@@ -181,7 +187,8 @@ document.addEventListener("DOMContentLoaded", () => {
   class Game {
     constructor(elements) {
       this.elements = elements;
-      this.trackPanZoom = new PanZoom(elements.trackWrapper, elements.trackContainer);
+      this.isImageInteraction = false;
+      
       this.mapPanZoom = new PanZoom(elements.mapWrapper, elements.mapContainer, {
         fit: true,
         maxZoom: 8,
@@ -197,7 +204,8 @@ document.addEventListener("DOMContentLoaded", () => {
       this.pendingGuess = null;
       this.confirmedGuess = null;
 
-      this.isMirrorMode = false;
+      this.gameMode = 'normal';
+
       this.isPracticeMode = false;
       this.currentImageLoadedSuccessfully = false;
       this.seedWasModified = false;
@@ -231,8 +239,13 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.guessLine.style.display = 'none';
 
       if (!this.canGuess) {
+          let answerX = this.currentTrack.mapX;
+          // ++ MODIFIED: Read from the map checkbox
+          if (this.gameMode === 'mirror' && this.elements.modeOptionMap.checked) {
+              answerX = (MAP_WIDTH - 1) - answerX;
+          }
           const answerLogicalPos = {
-              x: this.transformX(this.currentTrack.mapX),
+              x: answerX,
               y: this.currentTrack.mapY
           };
           const answerPixelPos = getPixelPos(answerLogicalPos);
@@ -281,12 +294,13 @@ document.addEventListener("DOMContentLoaded", () => {
         grid.appendChild(card);
       });
     }
-
-    transformX(x) {
-        if (this.isMirrorMode) { return (MAP_WIDTH - 1) - x; }
-        return x;
+    
+    updateStatusText() {
+        const totalEnabled = TRACKS_DATA.filter(t => t.enabled !== false).length;
+        const usedCount = getUsedImages().length;
+        this.elements.statusText.textContent = `You have seen ${usedCount} of ${totalEnabled} images.`;
     }
-    updateStatusText() { const totalEnabled = TRACKS_DATA.filter(t => t.enabled !== false).length; const usedCount = getUsedImages().length; this.elements.statusText.textContent = `You have seen ${usedCount} of ${totalEnabled} images.`; }
+
     displayLeaderboard() {
       const scores = getLeaderboard();
       const list = this.elements.leaderboardList;
@@ -299,6 +313,7 @@ document.addEventListener("DOMContentLoaded", () => {
         list.appendChild(li);
       });
     }
+    
     bindEvents() {
       this.elements.startBtn.addEventListener('click', () => this.start());
       this.elements.nextBtn.addEventListener('click', () => this.nextRound());
@@ -313,18 +328,33 @@ document.addEventListener("DOMContentLoaded", () => {
         } 
       });
       this.elements.backToMenuBtn.addEventListener('click', () => { if (confirm("Are you sure you want to quit? Your score will not be saved.")) { this.hideGameAndShowMenu(); } });
-      this.elements.modalPlayAgainBtn.addEventListener('click', () => { this.elements.endGameModal.hidden = true; this.start(); });
-      this.elements.modalBackToMenuBtn.addEventListener('click', () => { this.elements.endGameModal.hidden = true; this.hideGameAndShowMenu(); });
+      
+      this.elements.modalPlayAgainBtn.addEventListener('click', () => {
+        this.elements.endGameModal.hidden = true;
+        this.hideGameAndShowMenu();
+      });
+
+      this.elements.modalBackToMenuBtn.addEventListener('click', () => { 
+          this.elements.endGameModal.hidden = true; 
+          this.hideGameAndShowMenu(); 
+      });
       this.elements.saveScoreBtn.addEventListener('click', () => this.saveHighScore());
 
       this.elements.trackWrapper.addEventListener('mousemove', this.handleMagnifierMove.bind(this));
       this.elements.trackWrapper.addEventListener('mouseenter', this.handleMagnifierEnter.bind(this));
       this.elements.trackWrapper.addEventListener('mouseleave', this.handleMagnifierLeave.bind(this));
+
+      this.elements.trackWrapper.addEventListener('mousedown', () => {
+          this.isImageInteraction = true;
+          this.elements.magnifier.style.display = 'none';
+      });
+      window.addEventListener('mouseup', () => {
+          this.isImageInteraction = false;
+      });
     }
 
-    // ++ MODIFIED: Check if panning is active before showing the magnifier
     handleMagnifierEnter(e) {
-      if (this.trackPanZoom.isDown) return; // Don't show if user is panning
+      if (this.isImageInteraction) return;
 
       if (this.currentImageLoadedSuccessfully && !this.elements.trackWrapper.classList.contains('faded-out')) {
         this.elements.magnifier.style.display = 'block';
@@ -335,18 +365,12 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.magnifier.style.display = 'none';
     }
 
-    // ++ MODIFIED: Check if panning is active before moving the magnifier
     handleMagnifierMove(e) {
-      if (this.trackPanZoom.isDown) { // Don't move if user is panning
-          this.elements.magnifier.style.display = 'none'; // Also ensure it's hidden
-          return;
-      }
+      if (this.isImageInteraction) return;
       if (this.elements.magnifier.style.display !== 'block') return;
 
       const { trackWrapper, trackContainer, trackImage, magnifier } = this.elements;
-      const { scale, offset } = this.trackPanZoom;
       const rect = trackWrapper.getBoundingClientRect();
-
       const cursorX = e.clientX - rect.left;
       const cursorY = e.clientY - rect.top;
 
@@ -357,25 +381,20 @@ document.addEventListener("DOMContentLoaded", () => {
       const imgAspectRatio = imgNaturalWidth / imgNaturalHeight;
       const containerAspectRatio = containerWidth / containerHeight;
       
-      let renderedImgWidth, renderedImgHeight, xOffset = 0, yOffset = 0;
+      let xOffset = 0, yOffset = 0;
       if (imgAspectRatio > containerAspectRatio) {
-        renderedImgHeight = containerHeight;
-        renderedImgWidth = renderedImgHeight * imgAspectRatio;
+        const renderedImgWidth = containerHeight * imgAspectRatio;
         xOffset = (containerWidth - renderedImgWidth) / 2;
       } else {
-        renderedImgWidth = containerWidth;
-        renderedImgHeight = renderedImgWidth / imgAspectRatio;
+        const renderedImgHeight = containerWidth / imgAspectRatio;
         yOffset = (containerHeight - renderedImgHeight) / 2;
       }
 
       magnifier.style.left = `${cursorX - MAGNIFIER_SIZE / 2}px`;
       magnifier.style.top = `${cursorY - MAGNIFIER_SIZE / 2}px`;
 
-      const cursorOnPannedContentX = (cursorX / scale) - offset.x;
-      const cursorOnPannedContentY = (cursorY / scale) - offset.y;
-      
-      const logicalX = cursorOnPannedContentX - xOffset;
-      const logicalY = cursorOnPannedContentY - yOffset;
+      const logicalX = cursorX - xOffset;
+      const logicalY = cursorY - yOffset;
       
       const bgPosX = -logicalX * MAGNIFICATION_LEVEL + (MAGNIFIER_SIZE / 2);
       const bgPosY = -logicalY * MAGNIFICATION_LEVEL + (MAGNIFIER_SIZE / 2);
@@ -385,19 +404,30 @@ document.addEventListener("DOMContentLoaded", () => {
     
     startPracticeRound(track) {
       if (!track) return;
+      if (this.elements.modeSelector.value === "") {
+        alert("Please select a game mode first!");
+        return;
+      }
       this.setupGameSettings();
       this.isPracticeMode = true;
       this.shuffledTracks = [track];
       this.score = 0;
       this.round = 0;
       this.elements.scoreDisplay.textContent = "Score: 0";
+      document.body.classList.add('menu-active');
       this.elements.menu.hidden = true;
-      this.elements.menuBackground.hidden = true;
       this.elements.gameUI.hidden = false;
-      this.elements.mapImage.style.transform = this.isMirrorMode ? 'scaleX(-1)' : 'none';
+      
+      this.applyInGameEffects();
       this.loadRound();
     }
+    
     start() {
+      if (this.elements.modeSelector.value === "") {
+        alert("Please select a game mode first!");
+        return;
+      }
+
       this.setupGameSettings();
       this.isPracticeMode = false;
       this.seedWasModified = false;
@@ -422,15 +452,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
       this.score = 0; this.round = 0;
       this.elements.scoreDisplay.textContent = "Score: 0";
+      document.body.classList.add('menu-active');
       this.elements.menu.hidden = true;
-      this.elements.menuBackground.hidden = true;
       this.elements.gameUI.hidden = false;
-      this.elements.mapImage.style.transform = this.isMirrorMode ? 'scaleX(-1)' : 'none';
+      
+      this.applyInGameEffects();
       this.loadRound();
     }
     
     setupGameSettings() {
-        this.isMirrorMode = this.elements.mirrorModeCheckbox.checked;
+        this.gameMode = this.elements.modeSelector.value;
+        
         this.isTimerEnabled = !this.elements.unlimitedTimeCheckbox.checked;
         const roundDuration = parseInt(this.elements.roundTimerInput.value, 10);
         this.timerDuration = !isNaN(roundDuration) && roundDuration >= 5 ? roundDuration : 30;
@@ -438,10 +470,33 @@ document.addEventListener("DOMContentLoaded", () => {
         const fadeDuration = parseInt(this.elements.fadeTimerInput.value, 10);
         this.fadeTimerDuration = !isNaN(fadeDuration) && fadeDuration >= 1 ? fadeDuration : 10;
     }
+
+    applyInGameEffects() {
+        const { trackImage, mapImage, modeOptionTrack, modeOptionMap } = this.elements;
+        
+        trackImage.style.transform = '';
+        trackImage.style.filter = '';
+        mapImage.style.transform = '';
+        mapImage.style.filter = '';
+        trackImage.classList.remove('inverted-by-js');
+        mapImage.classList.remove('inverted-by-js');
+
+        if (this.gameMode === 'mirror') {
+            if (modeOptionTrack.checked) trackImage.style.transform = 'scaleX(-1)';
+            if (modeOptionMap.checked) mapImage.style.transform = 'scaleX(-1)';
+        } else if (this.gameMode === 'inverted') {
+            if (modeOptionTrack.checked) {
+                trackImage.style.filter = 'invert(1)';
+                trackImage.classList.add('inverted-by-js');
+            }
+             if (modeOptionMap.checked) {
+                mapImage.style.filter = 'invert(1)';
+                mapImage.classList.add('inverted-by-js');
+            }
+        }
+    }
     
     finalizeRoundSetup() {
-      this.elements.trackImage.style.transform = this.isMirrorMode ? 'scaleX(-1)' : 'none';
-      this.trackPanZoom.reset();
       this.mapPanZoom.reset();
       this.elements.confirmBtn.hidden = true;
       this.elements.nextBtn.hidden = true;
@@ -540,11 +595,14 @@ document.addEventListener("DOMContentLoaded", () => {
             alert("Time's up! Your guess has been automatically confirmed.");
             this.confirmedGuess = this.pendingGuess;
             this.pendingGuess = null;
-
-            const answerX = this.transformX(this.currentTrack.mapX);
-            const answerY = this.currentTrack.mapY;
+            
+            let answerX = this.currentTrack.mapX;
+            if (this.gameMode === 'mirror' && this.elements.modeOptionMap.checked) {
+                answerX = (MAP_WIDTH - 1) - answerX;
+            }
+            
             const dx = this.confirmedGuess.x - answerX;
-            const dy = this.confirmedGuess.y - answerY;
+            const dy = this.confirmedGuess.y - this.currentTrack.mapY;
             const distance = Math.hypot(dx, dy);
             let points = 0;
             if (distance <= 15) points = 200;
@@ -634,11 +692,13 @@ document.addEventListener("DOMContentLoaded", () => {
       this.elements.trackWrapper.classList.remove('faded-out');
       this.elements.magnifier.style.display = 'none';
       
-      const answerX = this.transformX(this.currentTrack.mapX);
-      const answerY = this.currentTrack.mapY;
+      let answerX = this.currentTrack.mapX;
+      if (this.gameMode === 'mirror' && this.elements.modeOptionMap.checked) {
+          answerX = (MAP_WIDTH - 1) - answerX;
+      }
       
       const dx = this.pendingGuess.x - answerX;
-      const dy = this.pendingGuess.y - answerY;
+      const dy = this.pendingGuess.y - this.currentTrack.mapY;
       const distance = Math.hypot(dx, dy); let points = 0;
       if (distance <= 15) points = 200; else if (distance <= 200) points = Math.round(200 - distance);
       this.score += points;
@@ -679,12 +739,18 @@ document.addEventListener("DOMContentLoaded", () => {
       this.stopAllTimers();
       this.elements.gameUI.hidden = true;
       this.elements.menu.hidden = false;
-      this.elements.menuBackground.hidden = false;
-      document.body.classList.remove('menu-active');
+      
+      document.body.classList.add('menu-active');
+
+      document.body.classList.remove('mirror-site');
+      document.documentElement.classList.remove('inverted-site');
+      
       this.elements.mapImage.style.transform = 'none';
+      this.elements.trackImage.style.transform = '';
       this.elements.nextBtn.textContent = 'Next Round';
       this.elements.timerDisplay.hidden = false;
       this.elements.trackNameDisplay.textContent = "";
+      
       this.displayLeaderboard();
       this.populatePracticeGrid();
     }
@@ -754,7 +820,6 @@ document.addEventListener("DOMContentLoaded", () => {
     gameUI: document.getElementById("game"), 
     startBtn: document.getElementById("start-btn"),
     seedInput: document.getElementById("seed"),
-    mirrorModeCheckbox: document.getElementById("mirror-mode"),
     trackWrapper: document.getElementById("track-wrapper"), 
     trackContainer: document.getElementById("track-container"),
     trackImage: document.getElementById("track-image"), 
@@ -794,6 +859,12 @@ document.addEventListener("DOMContentLoaded", () => {
     fadeTimerCheckbox: document.getElementById('fade-timer-checkbox'),
     endGameBtn: document.getElementById('end-game-btn'),
     magnifier: document.getElementById('magnifier'),
+    modeSelector: document.getElementById('mode-selector'),
+    // ++ REPLACED: New checkbox elements
+    modeOptionsContainer: document.getElementById('mode-options-container'),
+    modeOptionTrack: document.getElementById('mode-option-track'),
+    modeOptionMap: document.getElementById('mode-option-map'),
+    modeOptionSite: document.getElementById('mode-option-site'),
   };
   
   new Game(elements);
@@ -809,6 +880,68 @@ document.addEventListener("DOMContentLoaded", () => {
     elements.fadeTimerInput.disabled = !e.target.checked;
   });
   elements.fadeTimerCheckbox.dispatchEvent(new Event('change'));
+
+  // ++ REFACTORED: All mode UI logic is now handled here ++
+  function applySiteEffects() {
+      document.body.classList.toggle('mirror-site', elements.modeSelector.value === 'mirror' && elements.modeOptionSite.checked);
+      document.documentElement.classList.toggle('inverted-site', elements.modeSelector.value === 'inverted' && elements.modeOptionSite.checked);
+  }
+
+  function handleModeOptionChange() {
+      // Logic for the "Site" checkbox overriding the others
+      if (elements.modeOptionSite.checked) {
+          elements.modeOptionTrack.checked = true;
+          elements.modeOptionMap.checked = true;
+          elements.modeOptionTrack.disabled = true;
+          elements.modeOptionMap.disabled = true;
+      } else {
+          elements.modeOptionTrack.disabled = false;
+          elements.modeOptionMap.disabled = false;
+      }
+      
+      // Save current state
+      localStorage.setItem(MODE_OPTION_TRACK_KEY, elements.modeOptionTrack.checked);
+      localStorage.setItem(MODE_OPTION_MAP_KEY, elements.modeOptionMap.checked);
+      localStorage.setItem(MODE_OPTION_SITE_KEY, elements.modeOptionSite.checked);
+      
+      applySiteEffects();
+  }
+
+  function updateModeOptionsUI() {
+      const mode = elements.modeSelector.value;
+      if (mode === 'normal' || mode === '') {
+          elements.modeOptionsContainer.hidden = true;
+      } else {
+          elements.modeOptionsContainer.hidden = false;
+      }
+      handleModeOptionChange();
+  }
+  
+  elements.modeSelector.addEventListener('change', () => {
+      localStorage.setItem(MODE_KEY, elements.modeSelector.value);
+      updateModeOptionsUI();
+  });
+
+  // Add a single listener to the container for all checkbox changes
+  elements.modeOptionsContainer.addEventListener('change', handleModeOptionChange);
+  
+  function loadAndSetModeUI() {
+      const savedMode = localStorage.getItem(MODE_KEY);
+      // Load saved checkbox states, defaulting to track=true if nothing is stored
+      const track = localStorage.getItem(MODE_OPTION_TRACK_KEY) !== 'false'; 
+      const map = localStorage.getItem(MODE_OPTION_MAP_KEY) === 'true';
+      const site = localStorage.getItem(MODE_OPTION_SITE_KEY) === 'true';
+
+      if (savedMode) {
+          elements.modeSelector.value = savedMode;
+      }
+
+      elements.modeOptionTrack.checked = track;
+      elements.modeOptionMap.checked = map;
+      elements.modeOptionSite.checked = site;
+      
+      updateModeOptionsUI();
+  }
 
   const THEME_KEY = 'marioKartGeoGuessr_theme';
   const CUSTOM_COLOR_KEY = 'marioKartGeoGuessr_customColor';
@@ -856,4 +989,5 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   
   loadAndSetThemeUI();
+  loadAndSetModeUI();
 });
