@@ -100,5 +100,10 @@ const TRACKS_DATA = [
   { image: "images/img97.webp", name: "Tricking in the Desert", mapX: 1394, mapY: 820, credit: "Crazalu" },
   { image: "images/img98.webp", name: "Enjoying the View", mapX: 1159, mapY: 921, credit: "Crazalu" },
   { image: "images/img99.webp", name: "Wilderness Coast", mapX: 400, mapY: 857, credit: "Crazalu" },
-  { image: "images/img100.webp", name: "Zoinkers, Rosalina!", mapX: 425, mapY: 831, credit: "Crazalu" }
+  { image: "images/img100.webp", name: "Zoinkers, Rosalina!", mapX: 425, mapY: 831, credit: "Crazalu" },
+  { image: "images/img101.webp", name: "An Oceanic Bridge!", mapX: 555, mapY: 905, credit: "Crazalu" },
+  { image: "images/img102.webp", name: "Great View from up here!", mapX: 708, mapY: 934, credit: "Crazalu" },
+  { image: "images/img103.webp", name: "Icy Everything!", mapX: 1511, mapY: 190, credit: "Crazalu" },
+  { image: "images/img104.webp", name: "Falling off the Icy Cliff!", mapX: 1428, mapY: 251, credit: "Crazalu" },
+  { image: "images/img105.webp", name: "Running from the Spooky!", mapX: 1236, mapY: 205, credit: "Crazalu" },
 ];
