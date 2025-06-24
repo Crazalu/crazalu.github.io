@@ -133,6 +133,8 @@
         
         <button id="start-btn">Start Game</button>
         <button id="randomizer-btn" class="btn-secondary">Randomizer</button>
+        <button id="create-challenge-btn" class="btn-secondary">Create Challenge</button>
+        <button id="play-challenge-btn" class="btn-secondary">Play Challenge</button>
         
         <hr>
         
@@ -318,6 +320,55 @@
         <button id="reset-random-btn" class="btn-secondary">Reset to Default</button>
       </div>
     </div>
+  </div>
+
+  <div id="create-challenge-modal" class="modal-overlay wide-modal" hidden>
+    <div class="modal-content">
+      <span class="modal-close">×</span>
+      <div class="modal-body">
+        <h2>Create Custom Challenge</h2>
+        <p>Select 5 images below, then configure the settings for each round.</p>
+        
+        <div class="challenge-builder">
+            <div class="challenge-image-selector">
+                <div class="challenge-image-selector-header">
+                    <h3>Select 5 Images</h3>
+                    <button id="challenge-randomize-images-btn" class="btn-secondary btn-small">Randomize</button>
+                </div>
+                <div id="challenge-image-grid" class="custom-image-grid">
+                    <!-- Images will be populated by JS -->
+                </div>
+            </div>
+            <div id="challenge-selected-rounds" class="challenge-rounds-container">
+                <!-- Round configurations will be populated by JS -->
+            </div>
+        </div>
+        
+        <div id="challenge-result-container" hidden>
+            <h3>Challenge Generated!</h3>
+            <label for="challenge-code-output">Code:</label>
+            <input type="text" id="challenge-code-output" readonly>
+            <label for="challenge-link-output">Shareable Link:</label>
+            <input type="text" id="challenge-link-output" readonly>
+        </div>
+
+      </div>
+      <div class="modal-actions">
+          <button id="challenge-generate-btn" disabled>Generate Code & Link</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="play-challenge-modal" class="modal-overlay" hidden>
+      <div class="modal-content">
+          <span class="modal-close">×</span>
+          <h2>Play Custom Challenge</h2>
+          <p>Paste the code you received below.</p>
+          <input type="text" id="challenge-code-input" placeholder="Enter challenge code">
+          <div class="modal-actions">
+              <button id="start-challenge-btn">Start Challenge</button>
+          </div>
+      </div>
   </div>
 
 </body>

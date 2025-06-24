@@ -51,6 +51,13 @@ class Game {
       this.pendingGuess = null;
       this.confirmedGuess = null;
 
+      // Per-game settings
+      this.isRerunGame = false;
+      this.isRandomizedPerRound = false;
+      this.isCustomChallenge = false;
+      this.challengeConfig = null;
+
+      // Per-round settings (will be overwritten by challenge/randomizer)
       this.gameMode = 'normal';
       this.isMirrorTrack = false;
       this.isMirrorMap = false;
@@ -58,9 +65,6 @@ class Game {
       this.isInvertedTrack = false;
       this.isInvertedMap = false;
       this.isInvertedSite = false;
-      this.isRerunGame = false;
-      this.isRandomizedPerRound = false;
-
       this.isFragmentedMode = false;
       this.fragmentGridSize = { rows: 0, cols: 0 };
       this.fragmentCells = [];
@@ -189,6 +193,18 @@ class Game {
         this.elements.modeSelector.dispatchEvent(new Event('change'));
       });
       this.elements.revealFragmentBtn.addEventListener('click', () => this._revealRandomFragment());
+      
+      // Challenge buttons
+      this.elements.createChallengeBtn.addEventListener('click', () => { this.elements.createChallengeModal.hidden = false; });
+      this.elements.playChallengeBtn.addEventListener('click', () => { this.elements.playChallengeModal.hidden = false; });
+      this.elements.startChallengeBtn.addEventListener('click', () => {
+          const code = this.elements.challengeCodeInput.value.trim();
+          if (code) {
+              this.startFromChallengeCode(code);
+          } else {
+              alert("Please enter a challenge code.");
+          }
+      });
     }
 
     handleMagnifierEnter(e) {
@@ -406,6 +422,8 @@ class Game {
     }
 
     setupGameSettings() {
+        this.isCustomChallenge = false;
+        this.challengeConfig = null;
         this.gameMode = this.elements.modeSelector.value;
         this.isFragmentedMode = this.gameMode === 'fragmented';
         this.isMirrorTrack = false; this.isMirrorMap = false; this.isMirrorSite = false;
@@ -488,7 +506,11 @@ class Game {
     _updateActiveSettingsDisplay() {
         let parts = [];
         
-        if (this.isFragmentedMode) {
+        if (this.isCustomChallenge) {
+          parts.push("Mode: Custom Challenge");
+        } else if (this.isRandomizedPerRound) {
+            parts.push("Mode: Randomized Per Round");
+        } else if (this.isFragmentedMode) {
           const gridInfo = this.fragmentGrid === 'random' ? 'Random' : this.fragmentGridSize.rows ? `${this.fragmentGridSize.rows}x${this.fragmentGridSize.cols}` : 'Random';
           parts.push(`Mode: Fragmented (${gridInfo})`);
         } else {
@@ -516,21 +538,16 @@ class Game {
     applyInGameEffects() {
         const { trackImage, mapImage } = this.elements;
         
-        // This function now only toggles classes. CSS will handle the visual changes.
         document.body.classList.toggle('mirror-site', this.isMirrorSite);
-        document.documentElement.classList.toggle('inverted-site', this.isInvertedSite);
-
-        // Toggle mirror classes on individual elements
         trackImage.classList.toggle('mirrored', this.isMirrorTrack);
         mapImage.classList.toggle('mirrored', this.isMirrorMap);
 
-        // Handle invert filters directly as they don't conflict
-        trackImage.style.filter = this.isInvertedTrack ? 'invert(1)' : '';
-        mapImage.style.filter = this.isInvertedMap ? 'invert(1)' : '';
-        
-        // This is needed to counteract the site-wide invert filter
-        trackImage.classList.toggle('inverted-by-js', this.isInvertedTrack || this.isInvertedSite);
-        mapImage.classList.toggle('inverted-by-js', this.isInvertedMap || this.isInvertedSite);
+        // Set the site-wide inversion class.
+        document.documentElement.classList.toggle('inverted-site', this.isInvertedSite);
+
+        // Apply specific inversion filters ONLY when site-wide inversion is NOT active.
+        trackImage.style.filter = (this.isInvertedTrack && !this.isInvertedSite) ? 'invert(1)' : '';
+        mapImage.style.filter = (this.isInvertedMap && !this.isInvertedSite) ? 'invert(1)' : '';
     }
     
     finalizeRoundSetup() {
@@ -573,7 +590,10 @@ class Game {
     }
     
     loadRound() {
-      if (this.isRandomizedPerRound) {
+      // Determine per-round settings before anything else
+      if (this.isCustomChallenge) {
+          this._applyChallengeSettingsForRound();
+      } else if (this.isRandomizedPerRound) {
         this._randomizeCurrentSettings();
       }
       
@@ -607,6 +627,35 @@ class Game {
       };
       this.elements.trackImage.onerror = () => { this.handleImageError(0); };
       this.elements.trackImage.src = this.currentTrack.image;
+    }
+
+    _applyChallengeSettingsForRound() {
+        const config = this.challengeConfig.r[this.round];
+        const modeMap = ['normal', 'mirror', 'inverted', 'fragmented'];
+        const gridMap = ['random', '2x2', '2x3', '3x3'];
+
+        this.gameMode = modeMap[config.m];
+        
+        // Mirror Options
+        this.isMirrorTrack = !!config.mt;
+        this.isMirrorMap = !!config.mm;
+        this.isMirrorSite = false;
+
+        // Inverted Options
+        this.isInvertedTrack = !!config.it;
+        this.isInvertedMap = !!config.im;
+        this.isInvertedSite = !!config.is;
+        
+        // Fragment Options
+        this.fragmentCost = config.fc;
+        this.fragmentGrid = gridMap[config.fg];
+        this.fragmentInitialReveals = config.fi;
+
+        // Timer Options
+        this.isTimerEnabled = !!config.te;
+        this.timerDuration = config.td;
+        this.isFadeTimerEnabled = !!config.fe;
+        this.fadeTimerDuration = config.fd;
     }
 
     startRoundTimer() {
@@ -712,7 +761,7 @@ class Game {
         if (this.round < this.shuffledTracks.length - 1) { this.nextRound(); } else { this.showFinalResults(); }
         return;
       }
-      if (!this.seedWasModified && !this.isPracticeMode) {
+      if (!this.seedWasModified && !this.isPracticeMode && !this.isCustomChallenge) {
         this.seedWasModified = true;
         alert("An image could not be found. Rerolling to a new one for this round.");
       }
@@ -781,7 +830,7 @@ class Game {
       this.elements.resultText.textContent = `Distance: ${Math.round(distance)}px | +${points} pts`;
       this.elements.resultText.classList.remove('hidden');
       
-      if (this.currentImageLoadedSuccessfully && this.elements.seedInput.value.trim() === '' && !this.isPracticeMode && !this.isRerunGame) {
+      if (this.currentImageLoadedSuccessfully && this.elements.seedInput.value.trim() === '' && !this.isPracticeMode && !this.isRerunGame && !this.isCustomChallenge) {
         setUsedImages([...new Set([...getUsedImages(), this.currentTrack.image])]);
       }
       
@@ -847,7 +896,9 @@ class Game {
       }
       
       const seedContainer = this.elements.modalSeedContainer;
-      if(this.gameSeed === 'custom') {
+      if (this.isCustomChallenge) {
+        seedContainer.innerHTML = `<p>This was a custom challenge game. High scores are disabled.</p>`;
+      } else if(this.gameSeed === 'custom') {
         seedContainer.innerHTML = `<p>This was a custom game and cannot be shared with a seed.</p>`;
       } else {
         seedContainer.innerHTML = `<p>Game Seed:</p><div><span>${this.gameSeed}</span><button class="btn-secondary btn-copy-seed">Copy</button></div>`;
@@ -865,7 +916,7 @@ class Game {
     }
     
     isHighScore(score) {
-      if (score === 0 || this.isPracticeMode || this.isRerunGame) return false;
+      if (score === 0 || this.isPracticeMode || this.isRerunGame || this.isCustomChallenge) return false;
       const scores = getLeaderboard();
       const lowestScore = scores.length > 0 ? scores[scores.length - 1].score : 0;
       return score > lowestScore || scores.length < LEADERBOARD_MAX_ENTRIES;
@@ -923,8 +974,9 @@ class Game {
         fragmentOverlay.appendChild(fragment);
 
         const revealCount = Math.min(totalCells, this.fragmentInitialReveals);
+        const gameSeedForShuffle = this.isCustomChallenge ? Date.now() : this.gameSeed;
         const indices = Array.from({ length: totalCells }, (_, i) => i);
-        const shuffledIndices = seededShuffle(indices, this.gameSeed + this.round);
+        const shuffledIndices = seededShuffle(indices, gameSeedForShuffle + this.round);
         for(let i=0; i < revealCount; i++) {
             this._revealFragmentByIndex(shuffledIndices.pop());
         }
@@ -990,6 +1042,8 @@ class Game {
       this.isRerunGame = true; 
       this.seedWasModified = false;
       this.gameSeed = 'custom';
+      this.isCustomChallenge = false;
+      this.challengeConfig = null;
   
       this.shuffledTracks = seededShuffle(tracks, Math.random());
       
@@ -1002,5 +1056,36 @@ class Game {
       this.elements.gameUI.hidden = false;
       
       this.loadRound();
+    }
+
+    startFromChallengeCode(code) {
+        const config = decodeChallenge(code);
+        if (!config || !config.i || !config.r || config.i.length !== 5 || config.r.length !== 5) {
+            alert("Invalid or corrupt challenge code. The link may be incomplete.");
+            return;
+        }
+
+        const tracks = config.i.map(index => TRACKS_DATA[index]).filter(Boolean);
+        if (tracks.length !== 5) {
+            alert("Challenge code contains invalid image references. The game data may have changed since the challenge was created.");
+            return;
+        }
+
+        this.isCustomChallenge = true;
+        this.challengeConfig = config;
+        this.shuffledTracks = tracks;
+        this.gameSeed = `challenge_${code.substring(0, 10)}`;
+        
+        this.score = 0;
+        this.round = 0;
+        
+        this.elements.playChallengeModal.hidden = true;
+        this.elements.challengeCodeInput.value = '';
+        this.elements.scoreDisplay.textContent = "Score: 0";
+        document.body.classList.add('menu-active');
+        this.elements.menu.hidden = true;
+        this.elements.gameUI.hidden = false;
+
+        this.loadRound();
     }
 }

@@ -301,15 +301,233 @@ function initializeCustomGameUI(elements, game) {
     const selectedTracks = TRACKS_DATA.filter(track => selectedImagePaths.includes(track.image));
     
     if(selectedTracks.length > 0) {
-      // Before starting, ensure user has selected a game mode for the custom game
       if (elements.modeSelector.value === "") {
         alert("Please select a game mode for your custom game first!");
         return;
       }
-      game.setupGameSettings(); // Apply settings from main menu
+      game.setupGameSettings();
       game.startCustomGame(selectedTracks);
     }
   });
 
   populateCustomGrid();
+}
+
+function initializeChallengeUI(elements, game) {
+    if (!elements.createChallengeModal) return;
+
+    const MAX_CHALLENGE_ROUNDS = 5;
+    let selectedTracks = new Map(); // Map<trackIndex, trackObject>
+
+    const closeModal = (modal) => {
+        modal.hidden = true;
+    };
+    elements.createChallengeModal.querySelector('.modal-close').addEventListener('click', () => closeModal(elements.createChallengeModal));
+    elements.playChallengeModal.querySelector('.modal-close').addEventListener('click', () => closeModal(elements.playChallengeModal));
+
+    const populateImageGrid = () => {
+        const grid = elements.challengeImageGrid;
+        grid.innerHTML = '';
+        const fragment = document.createDocumentFragment();
+        const availableTracks = TRACKS_DATA.filter(t => t.enabled !== false);
+
+        availableTracks.forEach((track, index) => {
+            const card = document.createElement('div');
+            card.className = 'custom-card';
+            card.dataset.trackIndex = index;
+            card.innerHTML = `<img src="${track.image}" alt="${track.name}" loading="lazy"><p>${track.name || 'Unnamed'}</p>`;
+            card.addEventListener('click', () => toggleTrackSelection(index, track, card));
+            fragment.appendChild(card);
+        });
+        grid.appendChild(fragment);
+    };
+    
+    const toggleTrackSelection = (index, track, cardElement) => {
+        if (selectedTracks.has(index)) {
+            selectedTracks.delete(index);
+            cardElement.classList.remove('selected');
+        } else {
+            if (selectedTracks.size < MAX_CHALLENGE_ROUNDS) {
+                selectedTracks.set(index, track);
+                cardElement.classList.add('selected');
+            } else {
+                alert(`You can only select ${MAX_CHALLENGE_ROUNDS} images for a challenge.`);
+            }
+        }
+        updateSelectedRoundsUI();
+    };
+
+    const updateSelectedRoundsUI = () => {
+        const container = elements.challengeSelectedRounds;
+        container.innerHTML = '';
+        const fragment = document.createDocumentFragment();
+        
+        for (let i = 0; i < MAX_CHALLENGE_ROUNDS; i++) {
+            const roundEl = createRoundConfigElement(i);
+            fragment.appendChild(roundEl);
+        }
+        container.appendChild(fragment);
+        
+        let roundIndex = 0;
+        selectedTracks.forEach((track, trackIndex) => {
+            const roundEl = container.children[roundIndex];
+            roundEl.classList.remove('is-placeholder');
+            roundEl.dataset.trackIndex = trackIndex;
+            roundEl.querySelector('.challenge-round-image').src = track.image;
+            roundEl.querySelector('.challenge-round-title').textContent = `Round ${roundIndex + 1}: ${track.name}`;
+            roundIndex++;
+        });
+
+        elements.challengeGenerateBtn.disabled = selectedTracks.size !== MAX_CHALLENGE_ROUNDS;
+    };
+
+    const createRoundConfigElement = (roundNum) => {
+        const el = document.createElement('div');
+        el.className = 'challenge-round-config is-placeholder';
+        el.innerHTML = `
+            <div class="challenge-round-header">
+                <img class="challenge-round-image" src="images/marker.webp" alt="Round image">
+                <h4 class="challenge-round-title">Round ${roundNum + 1}: Select an image</h4>
+            </div>
+            <div class="challenge-round-body">
+                <div class="challenge-config-group">
+                    <label>Mode:</label>
+                    <select class="challenge-mode-selector">
+                        <option value="normal">Normal</option>
+                        <option value="mirror">Mirror</option>
+                        <option value="inverted">Inverted</option>
+                        <option value="fragmented">Fragmented</option>
+                    </select>
+                </div>
+                <!-- Mirror/Inverted Options -->
+                <div class="challenge-config-group challenge-mi-options" hidden>
+                    <span>Options:</span>
+                    <div class="checkbox-wrapper"><input type="checkbox" class="mi-track"><label>Track</label></div>
+                    <div class="checkbox-wrapper"><input type="checkbox" class="mi-map"><label>Map</label></div>
+                    <div class="checkbox-wrapper mi-site-wrapper" style="display: none;"><input type="checkbox" class="mi-site"><label>Site</label></div>
+                </div>
+                <!-- Fragmented Options -->
+                <div class="challenge-config-group challenge-frag-options" hidden>
+                     <div class="fragment-option"><label>Cost:</label><input type="number" class="frag-cost" value="20" min="0" step="5"></div>
+                     <div class="fragment-option"><label>Grid:</label><select class="frag-grid"><option value="random">Random</option><option value="2x2">2x2</option><option value="2x3">2x3</option><option value="3x3">3x3</option></select></div>
+                     <div class="fragment-option"><label>Initial:</label><input type="number" class="frag-initial" value="1" min="0"></div>
+                </div>
+                <!-- Timer Options -->
+                <div class="challenge-config-group challenge-timer-options">
+                    <div class="checkbox-wrapper"><input type="checkbox" class="timer-enable" checked><label>Round Timer</label></div>
+                    <input type="number" class="timer-duration" value="30" min="5">
+                    <div class="checkbox-wrapper"><input type="checkbox" class="fade-enable"><label>Image Fade</label></div>
+                    <input type="number" class="fade-duration" value="10" min="1" disabled>
+                </div>
+            </div>
+        `;
+
+        const modeSelector = el.querySelector('.challenge-mode-selector');
+        const miOptions = el.querySelector('.challenge-mi-options');
+        const fragOptions = el.querySelector('.challenge-frag-options');
+        const miSiteWrapper = el.querySelector('.mi-site-wrapper');
+
+        modeSelector.addEventListener('change', () => {
+            const mode = modeSelector.value;
+            miOptions.hidden = (mode !== 'mirror' && mode !== 'inverted');
+            fragOptions.hidden = (mode !== 'fragmented');
+            miSiteWrapper.style.display = (mode === 'inverted') ? 'inline-flex' : 'none';
+        });
+
+        const timerEnable = el.querySelector('.timer-enable');
+        const timerDuration = el.querySelector('.timer-duration');
+        timerEnable.addEventListener('change', () => timerDuration.disabled = !timerEnable.checked);
+
+        const fadeEnable = el.querySelector('.fade-enable');
+        const fadeDuration = el.querySelector('.fade-duration');
+        fadeEnable.addEventListener('change', () => fadeDuration.disabled = !fadeEnable.checked);
+
+        return el;
+    };
+
+    elements.challengeRandomizeImagesBtn.addEventListener('click', () => {
+        const allTrackIndexes = TRACKS_DATA.map((t, i) => t.enabled !== false ? i : -1).filter(i => i !== -1);
+        const shuffled = seededShuffle(allTrackIndexes, Date.now());
+        
+        selectedTracks.clear();
+        document.querySelectorAll('#challenge-image-grid .custom-card.selected').forEach(c => c.classList.remove('selected'));
+
+        for (let i = 0; i < Math.min(MAX_CHALLENGE_ROUNDS, shuffled.length); i++) {
+            const trackIndex = shuffled[i];
+            selectedTracks.set(trackIndex, TRACKS_DATA[trackIndex]);
+            const card = document.querySelector(`#challenge-image-grid .custom-card[data-track-index="${trackIndex}"]`);
+            if(card) card.classList.add('selected');
+        }
+        updateSelectedRoundsUI();
+    });
+
+    elements.challengeGenerateBtn.addEventListener('click', () => {
+        const roundElements = elements.challengeSelectedRounds.querySelectorAll('.challenge-round-config:not(.is-placeholder)');
+        if (roundElements.length !== MAX_CHALLENGE_ROUNDS) {
+            alert("Please select 5 images before generating a code.");
+            return;
+        }
+
+        const challengeData = {
+            i: [], // images
+            r: []  // rounds
+        };
+
+        const modeEnum = {'normal': 0, 'mirror': 1, 'inverted': 2, 'fragmented': 3};
+        const gridEnum = {'random': 0, '2x2': 1, '2x3': 2, '3x3': 3};
+
+        roundElements.forEach(roundEl => {
+            challengeData.i.push(parseInt(roundEl.dataset.trackIndex, 10));
+
+            const mode = roundEl.querySelector('.challenge-mode-selector').value;
+
+            const roundConfig = {
+                // Mode
+                m: modeEnum[mode],
+                // Options
+                mt: (mode === 'mirror' && roundEl.querySelector('.mi-track').checked) ? 1 : 0,
+                mm: (mode === 'mirror' && roundEl.querySelector('.mi-map').checked) ? 1 : 0,
+                it: (mode === 'inverted' && roundEl.querySelector('.mi-track').checked) ? 1 : 0,
+                im: (mode === 'inverted' && roundEl.querySelector('.mi-map').checked) ? 1 : 0,
+                is: (mode === 'inverted' && roundEl.querySelector('.mi-site').checked) ? 1 : 0,
+                // Fragment
+                fc: parseInt(roundEl.querySelector('.frag-cost').value, 10),
+                fg: gridEnum[roundEl.querySelector('.frag-grid').value],
+                fi: parseInt(roundEl.querySelector('.frag-initial').value, 10),
+                // Timer
+                te: roundEl.querySelector('.timer-enable').checked ? 1 : 0,
+                td: parseInt(roundEl.querySelector('.timer-duration').value, 10),
+                // Fade
+                fe: roundEl.querySelector('.fade-enable').checked ? 1 : 0,
+                fd: parseInt(roundEl.querySelector('.fade-duration').value, 10),
+            };
+            challengeData.r.push(roundConfig);
+        });
+
+        const code = encodeChallenge(challengeData);
+        if (code) {
+            elements.challengeResultContainer.hidden = false;
+            elements.challengeCodeOutput.value = code;
+            const url = new URL(window.location.href);
+            url.searchParams.set('challenge', code);
+            elements.challengeLinkOutput.value = url.toString();
+        } else {
+            alert("Failed to generate challenge code. Please check console for errors.");
+        }
+    });
+
+    const checkUrlForChallenge = () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const challengeCode = urlParams.get('challenge');
+        if (challengeCode) {
+            history.pushState({}, document.title, window.location.pathname); // Clean URL
+            const urlSafeCode = challengeCode.replace(/-/g, '+').replace(/_/g, '/');
+            game.startFromChallengeCode(urlSafeCode);
+        }
+    };
+    
+    // Auto-fill and start from URL param
+    checkUrlForChallenge();
+    populateImageGrid();
+    updateSelectedRoundsUI();
 }

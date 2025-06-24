@@ -1,3 +1,5 @@
+// js/main.js
+
 document.addEventListener("DOMContentLoaded", () => {
   const elements = {
     menu: document.getElementById("menu"), 
@@ -48,7 +50,7 @@ document.addEventListener("DOMContentLoaded", () => {
     modeOptionTrack: document.getElementById('mode-option-track'),
     modeOptionMap: document.getElementById('mode-option-map'),
     modeOptionSite: document.getElementById('mode-option-site'),
-    siteOptionWrapper: document.getElementById('site-option-wrapper'), // Added this line
+    siteOptionWrapper: document.getElementById('site-option-wrapper'),
     resetModeBtn: document.getElementById('reset-mode-btn'),
     randomizerBtn: document.getElementById('randomizer-btn'),
     randomizerModal: document.getElementById('randomizer-modal'),
@@ -98,9 +100,24 @@ document.addEventListener("DOMContentLoaded", () => {
     selectAllBtn: document.getElementById('select-all-btn'),
     deselectAllBtn: document.getElementById('deselect-all-btn'),
     startCustomGameBtn: document.getElementById('start-custom-game-btn'),
+    // Challenge UI Elements
+    createChallengeBtn: document.getElementById('create-challenge-btn'),
+    playChallengeBtn: document.getElementById('play-challenge-btn'),
+    createChallengeModal: document.getElementById('create-challenge-modal'),
+    playChallengeModal: document.getElementById('play-challenge-modal'),
+    challengeImageGrid: document.getElementById('challenge-image-grid'),
+    challengeSelectedRounds: document.getElementById('challenge-selected-rounds'),
+    challengeRandomizeImagesBtn: document.getElementById('challenge-randomize-images-btn'),
+    challengeGenerateBtn: document.getElementById('challenge-generate-btn'),
+    challengeResultContainer: document.getElementById('challenge-result-container'),
+    challengeCodeOutput: document.getElementById('challenge-code-output'),
+    challengeLinkOutput: document.getElementById('challenge-link-output'),
+    challengeCodeInput: document.getElementById('challenge-code-input'),
+    startChallengeBtn: document.getElementById('start-challenge-btn'),
   };
   
   initializeUI(elements);
   const game = new Game(elements);
   initializeCustomGameUI(elements, game);
+  initializeChallengeUI(elements, game);
 });

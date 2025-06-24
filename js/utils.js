@@ -1,3 +1,5 @@
+// js/utils.js
+
 // LocalStorage and Data Helpers
 const USED_IMAGES_KEY = 'marioKartGeoGuessr_usedImages';
 const PRACTICE_UNLOCKS_KEY = 'marioKartGeoGuessr_practiceUnlocks';
@@ -44,4 +46,29 @@ function seededShuffle(array, seed) {
     [c[i], c[j]] = [c[j], c[i]];
   }
   return c;
+}
+
+// --- NEW, SIMPLIFIED CHALLENGE CODE FUNCTIONS ---
+
+function encodeChallenge(config) {
+    try {
+        const jsonString = JSON.stringify(config);
+        // btoa() creates a Base64 encoded string from a binary string.
+        return btoa(jsonString);
+    } catch (error) {
+        console.error("Failed to encode challenge:", error);
+        return null;
+    }
+}
+
+function decodeChallenge(encodedString) {
+    try {
+        // atob() decodes a Base64 encoded string.
+        const jsonString = atob(encodedString);
+        if (!jsonString) return null;
+        return JSON.parse(jsonString);
+    } catch (error) {
+        console.error("Failed to decode or parse challenge string. It might be invalid or corrupt.", error);
+        return null;
+    }
 }

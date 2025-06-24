@@ -97,8 +97,8 @@ const TRACKS_DATA = [
   { image: "images/img94.webp", name: "Tricking on Tracks!", mapX: 328, mapY: 496, credit: "Crazalu" },
   { image: "images/img95.webp", name: "Tricking on a House", mapX: 689, mapY: 424, credit: "Crazalu" },
   { image: "images/img96.webp", name: "Explosion!", mapX: 678, mapY: 372, credit: "Crazalu" },
-  { image: "images/img97.webp", name: "I am Egg", mapX: 1347, mapY: 997, enabled: false, credit: "Electric_Hoodie" },
-  { image: "images/img98.webp", name: "I am Egg", mapX: 1347, mapY: 997, enabled: false, credit: "Electric_Hoodie" },
-  { image: "images/img99.webp", name: "I am Egg", mapX: 1347, mapY: 997, enabled: false, credit: "Electric_Hoodie" },
-  { image: "images/img100.webp", name: "I am Egg", mapX: 1347, mapY: 997, enabled: false, credit: "Electric_Hoodie" }
+  { image: "images/img97.webp", name: "Tricking in the Desert", mapX: 1394, mapY: 820, credit: "Crazalu" },
+  { image: "images/img98.webp", name: "Enjoying the View", mapX: 1159, mapY: 921, credit: "Crazalu" },
+  { image: "images/img99.webp", name: "Wilderness Coast", mapX: 400, mapY: 857, credit: "Crazalu" },
+  { image: "images/img100.webp", name: "Zoinkers, Rosalina!", mapX: 425, mapY: 831, credit: "Crazalu" }
 ];
