@@ -106,4 +106,19 @@ const TRACKS_DATA = [
   { image: "images/img103.webp", name: "Icy Everything!", mapX: 1511, mapY: 190, credit: "Crazalu" },
   { image: "images/img104.webp", name: "Falling off the Icy Cliff!", mapX: 1428, mapY: 251, credit: "Crazalu" },
   { image: "images/img105.webp", name: "Running from the Spooky!", mapX: 1236, mapY: 205, credit: "Crazalu" },
+  { image: "images/img106.webp", name: "Gone Fishin'!", mapX: 1259, mapY: 465, credit: "SudaiDelphi" },
+  { image: "images/img107.webp", name: "Industrial Revolution!", mapX: 1239, mapY: 407, credit: "SudaiDelphi" },
+  { image: "images/img108.webp", name: "Palm Trees!", mapX: 254, mapY: 497, credit: "SudaiDelphi" },
+  { image: "images/img109.webp", name: "This way to treasure!", mapX: 96, mapY: 556, credit: "SudaiDelphi" },
+  { image: "images/img110.webp", name: "Coin Circling!", mapX: 1161, mapY: 359, credit: "SudaiDelphi" },
+  { image: "images/img111.webp", name: "Lazy River", mapX: 453, mapY: 486, credit: "SudaiDelphi" },
+  { image: "images/img112.webp", name: "Dumpster Diving!", mapX: 540, mapY: 467, credit: "SudaiDelphi" },
+  { image: "images/img113.webp", name: "Wave River!", mapX: 326, mapY: 478, credit: "SudaiDelphi" },
+  { image: "images/img114.webp", name: "Fortnite Bush Strats!", mapX: 1101, mapY: 436, credit: "SudaiDelphi" },
+  { image: "images/img115.webp", name: "Sir, this is a Yoshi's", mapX: 1060, mapY: 338, credit: "SudaiDelphi" },
+  { image: "images/img116.webp", name: "Look at the peasants...", mapX: 1241, mapY: 342, credit: "SudaiDelphi" },
+  { image: "images/img117.webp", name: "Eating at the Countryside...?", mapX: 1608, mapY: 725, credit: "Crazalu" },
+  { image: "images/img118.webp", name: "Eating by the Street...?"", mapX: 1438, mapY: 684, credit: "Crazalu" }.
+  { image: "images/img119.webp", name: "A Disaster is Coming...", mapX: 1446, mapY: 632, credit: "Crazalu" }.
+  { image: "images/img120.webp", name: "Out of this Ocean!", mapX: 702, mapY: 868, credit: "Crazalu" }
 ];
