@@ -118,7 +118,7 @@ const TRACKS_DATA = [
   { image: "images/img115.webp", name: "Sir, this is a Yoshi's", mapX: 1060, mapY: 338, credit: "SudaiDelphi" },
   { image: "images/img116.webp", name: "Look at the peasants...", mapX: 1241, mapY: 342, credit: "SudaiDelphi" },
   { image: "images/img117.webp", name: "Eating at the Countryside...?", mapX: 1608, mapY: 725, credit: "Crazalu" },
-  { image: "images/img118.webp", name: "Eating by the Street...?"", mapX: 1438, mapY: 684, credit: "Crazalu" }.
-  { image: "images/img119.webp", name: "A Disaster is Coming...", mapX: 1446, mapY: 632, credit: "Crazalu" }.
-  { image: "images/img120.webp", name: "Out of this Ocean!", mapX: 702, mapY: 868, credit: "Crazalu" }
+  { image: "images/img118.webp", name: "Eating by the Street...?", mapX: 1438, mapY: 684, credit: "Crazalu" },
+  { image: "images/img119.webp", name: "A Disaster is Coming...", mapX: 1446, mapY: 632, credit: "Crazalu" },  
+{ image: "images/img120.webp", name: "Out of this Ocean!", mapX: 702, mapY: 868, credit: "Crazalu" },
 ];
