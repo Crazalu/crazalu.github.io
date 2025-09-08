@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GIF to PyWright Sprite Sheet Converter (Client-Side)</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f7f6;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            max-width: 800px;
+            width: 100%;
+            text-align: center;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 1.8em;
+        }
+        p {
+            color: #7f8c8d;
+            margin-bottom: 25px;
+            line-height: 1.6;
+        }
+        /* File Upload Styles */
+        input[type="file"] {
+            display: none; /* Hide default file input */
+        }
+        .custom-file-upload {
+            border: 2px dashed #3498db;
+            padding: 15px 20px;
+            cursor: pointer;
+            border-radius: 8px;
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #3498db;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .custom-file-upload:hover {
+            background-color: #e8f5fd;
+            border-color: #2980b9;
+        }
+        .custom-file-upload.has-file {
+            border-color: #27ae60;
+            color: #27ae60;
+        }
+        .custom-file-upload.has-file:hover {
+            background-color: #e6f7ee;
+            border-color: #219d55;
+        }
+        #filenameDisplay {
+            font-style: italic;
+            color: #555;
+            margin-top: -15px;
+            margin-bottom: 20px;
+            min-height: 20px; /* To prevent layout shift */
+        }
+
+        /* Naming Section Styles */
+        .naming-section {
+            background-color: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 25px;
+            text-align: left;
+        }
+        .naming-section label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+        }
+        .naming-section input[type="text"] {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        .suffix-options {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+        .suffix-options label {
+            display: flex;
+            align-items: center;
+            font-weight: normal;
+            cursor: pointer;
+            color: #333;
+            margin-bottom: 0; /* Override default label margin */
+        }
+        .suffix-options input[type="radio"] {
+            margin-right: 5px;
+            accent-color: #3498db; /* Custom color for radio button */
+        }
+
+        /* Button Styles */
+        button {
+            background-color: #3498db;
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s ease;
+            margin-bottom: 20px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        /* Message and Download Styles */
+        #messages {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            background-color: #e9ecef;
+            color: #343a40;
+            text-align: left;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9em;
+        }
+        #messages p {
+            margin: 0;
+            color: inherit;
+        }
+        #download-links {
+            margin-top: 25px;
+            border-top: 1px solid #eee;
+            padding-top: 25px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        #download-links a {
+            display: inline-block;
+            background-color: #27ae60;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: background-color 0.3s ease;
+        }
+        #download-links a:hover {
+            background-color: #219d55;
+        }
+
+        /* Preview Area Styles */
+        .preview-area {
+            margin-top: 30px;
+            border-top: 1px solid #eee;
+            padding-top: 25px;
+        }
+        #spritesheetPreview {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>GIF to PyWright Sprite Sheet Converter</h1>
+        <p>Upload a GIF, name your sprite, select a suffix, and this tool will generate a sprite sheet PNG and a PyWright-compatible .txt animation definition file.</p>
+
+        <label for="gifInput" class="custom-file-upload" id="fileUploadLabel">
+            Choose GIF File
+        </label>
+        <input type="file" id="gifInput" accept="image/gif">
+        <div id="filenameDisplay">No file chosen</div>
+
+        <div class="naming-section">
+            <label for="spriteName">Sprite Base Name:</label>
+            <input type="text" id="spriteName" placeholder="e.g., normal, player_walk">
+
+            <label>Suffix:</label>
+            <div class="suffix-options">
+                <label>
+                    <input type="radio" name="spriteSuffix" value="(blink)" checked> (blink)
+                </label>
+                <label>
+                    <input type="radio" name="spriteSuffix" value="(talk)"> (talk)
+                </label>
+                <label>
+                    <input type="radio" name="spriteSuffix" value="neither"> Neither
+                </label>
+            </div>
+        </div>
+
+        <button id="convertButton" disabled>Convert GIF</button>
+
+        <div id="messages">
+            <p>Please upload a GIF and provide a base name to begin.</p>
+        </div>
+
+        <div id="download-links"></div>
+
+        <div class="preview-area">
+            <h2>Sprite Sheet Preview</h2>
+            <img id="spritesheetPreview" src="" alt="Sprite Sheet Preview" style="display:none;">
+        </div>
+    </div>
+
+    <!-- Load gifler.min.js locally. Ensure this file is in the same directory. -->
+    <script src="gifler.min.js"></script>
+    
+    <!-- Your custom script.js must come AFTER gifler.min.js -->
+    <!-- UPDATED: Script filename changed to script2.js -->
+    <script src="script2.js"></script>
+</body>
+</html>
