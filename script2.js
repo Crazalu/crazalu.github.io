@@ -9,28 +9,31 @@ document.addEventListener('DOMContentLoaded', () => {
     const filenameDisplay = document.getElementById('filenameDisplay');
     const spritesheetPreview = document.getElementById('spritesheetPreview');
 
-    // --- IMPORTANT DEBUGGING STEP ---
-    // Check if gifler is available right after DOMContentLoaded
-    // This message should now be very clear if the file isn't loaded correctly.
     if (typeof gifler === 'undefined') {
         console.error("CRITICAL ERROR: 'gifler' library is not defined. This means 'gifler.min.js' was NOT loaded or parsed by the browser.");
         messagesDiv.innerHTML = '<p style="color: red;"><strong>CRITICAL ERROR: GIF parsing library not loaded.</strong><br>Please check your browser\'s Developer Console (F12 -> Console/Network/Sources tabs). Ensure `gifler.min.js` is in the same folder as `conv.html` and `script2.js`, and that the `conv.html` `<script src="gifler.min.js"></script>` tag is correct.</p>';
-        convertButton.disabled = true; // Keep button disabled if library is missing
-        return; // Stop further execution as gifler is critical
+        convertButton.disabled = true;
+        return;
     } else {
-        console.log("'gifler' library successfully detected."); // Debugging: Confirm it's found
+        console.log("'gifler' library successfully detected.");
+        // Added more checks to see what gifler exposes
+        console.log("Type of gifler:", typeof gifler);
+        try {
+            // Attempt to call gifler with a dummy object to see its return structure without triggering a fetch
+            const dummyGifler = gifler({ src: '' }); 
+            console.log("gifler returns object with 'get' method:", typeof dummyGifler.get === 'function');
+        } catch (e) {
+            console.error("Error probing gifler API:", e);
+        }
     }
-    // --- END DEBUGGING STEP ---
 
-
-    // Function to update the overall state of the convert button and main message
     function updateConvertButtonAndMessageState() {
         const hasFile = gifInput.files.length > 0;
         const hasName = spriteNameInput.value.trim() !== '';
 
-        console.log(`[UI State] Has File: ${hasFile}, Has Name: ${hasName}`); // Debugging
+        console.log(`[UI State] Has File: ${hasFile}, Has Name: ${hasName}`);
         convertButton.disabled = !(hasFile && hasName);
-        console.log(`[UI State] Convert Button Disabled: ${convertButton.disabled}`); // Debugging
+        console.log(`[UI State] Convert Button Disabled: ${convertButton.disabled}`);
 
         if (!hasFile && !hasName) {
             messagesDiv.innerHTML = '<p>Please upload a GIF and provide a base name.</p>';
@@ -43,9 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Event Listener for GIF file input changes
     gifInput.addEventListener('change', () => {
-        // Clear previous outputs regardless of selection
         downloadLinksDiv.innerHTML = '';
         spritesheetPreview.style.display = 'none';
         spritesheetPreview.src = '';
@@ -57,108 +58,102 @@ document.addEventListener('DOMContentLoaded', () => {
             filenameDisplay.textContent = 'No file chosen';
             fileUploadLabel.classList.remove('has-file');
         }
-        // Update button and message state after file-specific UI
         updateConvertButtonAndMessageState();
     });
 
-    // Event Listeners for name input and suffix radio changes
     spriteNameInput.addEventListener('input', updateConvertButtonAndMessageState);
     suffixRadios.forEach(radio => radio.addEventListener('change', updateConvertButtonAndMessageState));
 
-    // Initial state setup on page load
     updateConvertButtonAndMessageState();
 
     convertButton.addEventListener('click', async () => {
-        console.log('Convert Button Clicked!'); // Debugging: Confirm click event fires
+        console.log('Convert Button Clicked!');
 
         const file = gifInput.files[0];
         const baseName = spriteNameInput.value.trim();
         const selectedSuffix = document.querySelector('input[name="spriteSuffix"]:checked').value;
 
-        console.log(`File: ${file ? file.name : 'None'}, Base Name: "${baseName}", Suffix: "${selectedSuffix}"`); // Debugging inputs
+        console.log(`File: ${file ? file.name : 'None'}, Base Name: "${baseName}", Suffix: "${selectedSuffix}"`);
 
-        // Re-validate just before conversion in case state was manipulated
         if (!file || !file.type.startsWith('image/gif')) {
             messagesDiv.innerHTML = '<p style="color: red;">Please select a GIF file.</p>';
-            updateConvertButtonAndMessageState(); // Re-enable button if invalid state
+            updateConvertButtonAndMessageState();
             return;
         }
         if (!baseName) {
             messagesDiv.innerHTML = '<p style="color: red;">Please enter a base name for the sprite.</p>';
-            updateConvertButtonAndMessageState(); // Re-enable button if invalid state
+            updateConvertButtonAndMessageState();
             return;
         }
 
-        convertButton.disabled = true; // Disable button immediately to prevent multiple clicks
+        convertButton.disabled = true;
         messagesDiv.innerHTML = '<p>Processing GIF... This may take a moment for larger GIFs.</p>';
         downloadLinksDiv.innerHTML = '';
         spritesheetPreview.style.display = 'none';
         spritesheetPreview.src = '';
 
         try {
-            console.log('Reading GIF file as ArrayBuffer...'); // Debugging step
+            console.log('Reading GIF file as ArrayBuffer...');
             const arrayBuffer = await file.arrayBuffer();
-            console.log('ArrayBuffer created. Parsing GIF with gifler...'); // Debugging step
+            
+            // --- NEW DEBUGGING LOGS ---
+            console.log('ArrayBuffer created. Size:', arrayBuffer.byteLength, 'bytes');
+            console.log('Type of arrayBuffer:', typeof arrayBuffer, arrayBuffer.constructor.name);
+            if (arrayBuffer.byteLength === 0) {
+                throw new Error("Uploaded GIF file resulted in an empty ArrayBuffer.");
+            }
+            console.log('Attempting to parse GIF with gifler, passing object:', { arrayBuffer: arrayBuffer });
+            // --- END NEW DEBUGGING LOGS ---
 
-            // CORRECTED LINE HERE: gifler expects an object with an 'arrayBuffer' property
-            const gif = await gifler({ arrayBuffer: arrayBuffer }).get(); 
-            console.log('GIF parsed by gifler.'); // Debugging step
+            const gif = await gifler({ arrayBuffer: arrayBuffer }).get();
+            console.log('GIF parsed by gifler.');
 
             const frames = gif.frames;
             if (!frames || frames.length === 0) {
                 throw new Error("No frames found in GIF.");
             }
+            console.log('Number of GIF frames:', frames.length);
 
             const frameWidth = frames[0].width;
             const frameHeight = frames[0].height;
             const numFrames = frames.length;
 
-            // --- Logic for calculating rows and columns (max 10 frames per row) ---
             const maxFramesPerRow = 10;
-            const horizontalFrames = Math.min(numFrames, maxFramesPerRow); // Max 10 per row
-            const verticalFrames = Math.ceil(numFrames / horizontalFrames); // Calculate required rows
+            const horizontalFrames = Math.min(numFrames, maxFramesPerRow);
+            const verticalFrames = Math.ceil(numFrames / horizontalFrames);
 
-            // Calculate sprite sheet dimensions
             const spritesheetWidth = horizontalFrames * frameWidth;
             const spritesheetHeight = verticalFrames * frameHeight;
 
-            // Create an offscreen canvas for the sprite sheet
             const spritesheetCanvas = document.createElement('canvas');
             spritesheetCanvas.width = spritesheetWidth;
             spritesheetCanvas.height = spritesheetHeight;
             const ctx = spritesheetCanvas.getContext('2d');
 
-            // --- Construct final filename ---
             let finalName = baseName;
             if (selectedSuffix !== 'neither') {
                 finalName += selectedSuffix;
             }
 
-            // --- PyWright .txt file parameters ---
             const animationLength = numFrames;
-            const loops = 1; // As per the reference file `loops 1`
+            const loops = 1;
 
             const pywrightTxtLines = [];
-            // Add NAME at the very beginning of the PyWright TXT output
             pywrightTxtLines.push(`NAME=${finalName}`);
             pywrightTxtLines.push(`horizontal ${horizontalFrames}`);
             pywrightTxtLines.push(`vertical ${verticalFrames}`);
             pywrightTxtLines.push(`length ${animationLength}`);
             pywrightTxtLines.push(`loops ${loops}`);
 
-            // Process each frame and draw it onto the sprite sheet
             for (let i = 0; i < numFrames; i++) {
                 const frame = frames[i];
 
-                // Calculate current row and column for drawing
                 const col = i % horizontalFrames;
                 const row = Math.floor(i / horizontalFrames);
 
                 const drawX = col * frameWidth;
                 const drawY = row * frameHeight;
 
-                // Create an ImageBitmap from the frame's pixel data
-                // This assumes frame.patch is a Uint8ClampedArray or similar raw pixel data
                 const imageData = new ImageData(
                     new Uint8ClampedArray(frame.patch),
                     frame.width,
@@ -166,22 +161,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 );
                 const imageBitmap = await createImageBitmap(imageData);
 
-                ctx.drawImage(imageBitmap, drawX, drawY); // Draw frame onto spritesheet
+                ctx.drawImage(imageBitmap, drawX, drawY);
 
-                // PyWright framedelay calculation (60 FPS)
                 const gifDelayMs = frame.delay;
                 const pywrightDelay = Math.max(1, Math.round((gifDelayMs / 1000) * 60));
 
                 pywrightTxtLines.push(`framedelay ${i} ${pywrightDelay}`);
             }
 
-            // Generate PyWright .txt content
             const spritesheetFilename = `${finalName}.png`;
             const pywrightTxtFilename = `${finalName}.txt`;
 
             const pywrightOutput = pywrightTxtLines.join('\n');
 
-            // Get Blob for Sprite Sheet
             spritesheetCanvas.toBlob(blob => {
                 const spritesheetUrl = URL.createObjectURL(blob);
                 downloadLinksDiv.innerHTML += `
@@ -189,25 +181,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
                 spritesheetPreview.src = spritesheetUrl;
                 spritesheetPreview.style.display = 'block';
-                console.log('Sprite sheet URL created.'); // Debugging
+                console.log('Sprite sheet URL created.');
             }, 'image/png');
 
-            // Get Blob for PyWright TXT
             const txtBlob = new Blob([pywrightOutput], { type: 'text/plain' });
             const txtUrl = URL.createObjectURL(txtBlob);
             downloadLinksDiv.innerHTML += `
                 <a href="${txtUrl}" download="${pywrightTxtFilename}">Download PyWright TXT (${pywrightTxtFilename})</a>
             `;
-            console.log('PyWright TXT URL created.'); // Debugging
+            console.log('PyWright TXT URL created.');
 
             messagesDiv.innerHTML = '<p style="color: green;">Conversion complete! Download your files below.</p>';
-            console.log('Conversion successful!'); // Debugging
+            console.log('Conversion successful!');
 
         } catch (error) {
             messagesDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
-            console.error('Client-side error during conversion:', error); // More specific error message
+            console.error('Client-side error during conversion:', error);
         } finally {
-            // Ensure button is re-enabled and message updated, even if an error occurred
             updateConvertButtonAndMessageState();
         }
     });
